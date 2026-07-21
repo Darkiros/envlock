@@ -18,9 +18,16 @@ APP_NAME = "EnvLock"
 
 # Réglages par défaut (utilisés au premier lancement).
 DEFAULTS: dict[str, Any] = {
-    "animation": "particles",
+    "animation": "sphere",
     "clock": {"show": True},
     "animations": {
+        "sphere": {
+            "count": 130,
+            "link_distance": 0.46,
+            "speed": 0.006,
+            "color": "#6fb3ff",
+            "background": "#05070d",
+        },
         "particles": {
             "count": 90,
             "link_distance": 140,

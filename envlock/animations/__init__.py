@@ -7,9 +7,11 @@ from .base import BaseAnimation
 from .gradient import GradientAnimation
 from .matrix import MatrixAnimation
 from .particles import ParticlesAnimation
+from .sphere import SphereAnimation
 
 # Ordre = ordre d'affichage dans le panneau.
 ANIMATIONS: dict[str, type[BaseAnimation]] = {
+    SphereAnimation.key: SphereAnimation,
     ParticlesAnimation.key: ParticlesAnimation,
     MatrixAnimation.key: MatrixAnimation,
     GradientAnimation.key: GradientAnimation,

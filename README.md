@@ -6,8 +6,8 @@ animé, bloque les raccourcis clavier d'évasion et empêche la mise en veille �
 
 ## Fonctionnalités
 
-- 3 animations au choix, avec **aperçu en direct** : réseau de particules,
-  Matrix rain, dégradé fluide.
+- 4 animations au choix, avec **aperçu en direct** : sphère de particules 3D
+  (plexus sphere rotatif), réseau de particules, Matrix rain, dégradé fluide.
 - Horloge/date optionnelle sur l'écran verrouillé.
 - Mot de passe **hashé** (PBKDF2-HMAC-SHA256 + sel, stdlib) dans un fichier de
   config, **modifiable depuis l'application**.
