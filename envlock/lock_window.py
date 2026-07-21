@@ -12,6 +12,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QFont, QKeyEvent
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -126,12 +127,26 @@ class LockWindow(QWidget):
 
     # ------------------------------------------------------------------
     def start(self) -> None:
-        self.showFullScreen()
+        app = QApplication.instance()
+        primary = app.primaryScreen()
+
+        # Fenêtre interactive (carte + horloge) sur l'écran principal.
+        _cover_screen(self, primary)
+
+        # Un cache animé plein écran sur CHAQUE autre écran.
+        self._secondaries: list[SecondaryLockWindow] = []
+        for screen in app.screens():
+            if screen is primary:
+                continue
+            sec = SecondaryLockWindow(self.config, self)
+            _cover_screen(sec, screen)
+            self._secondaries.append(sec)
+
         self.raise_()
         self.activateWindow()
         self._locker.start()
         self.setFocus()
-        # Watchdog : garde la fenêtre au premier plan si une autre app tente
+        # Watchdog : garde les fenêtres au premier plan si une autre app tente
         # de passer devant (ex. notification, fenêtre lancée avant le lock).
         self._watchdog = QTimer(self)
         self._watchdog.timeout.connect(self._keep_on_top)
@@ -140,10 +155,18 @@ class LockWindow(QWidget):
     def _keep_on_top(self) -> None:
         if self._unlocking or not self.isVisible():
             return
+        for sec in getattr(self, "_secondaries", []):
+            sec.raise_()
         self.raise_()
         # Ne pas voler le focus au champ mot de passe quand la carte est ouverte.
         if not self.card.isVisible() and not self.isActiveWindow():
             self.activateWindow()
+
+    def focus_and_show_card(self) -> None:
+        """Appelé quand Entrée est pressée depuis un écran secondaire."""
+        self.activateWindow()
+        self.raise_()
+        self._show_card()
 
     def _update_clock(self) -> None:
         now = QTime.currentTime()
@@ -211,6 +234,10 @@ class LockWindow(QWidget):
     def _do_unlock(self) -> None:
         self._unlocking = True
         self._locker.stop()
+        for sec in getattr(self, "_secondaries", []):
+            sec.allow_close()
+            sec.close()
+        self._secondaries = []
         self.unlocked.emit()
         self.close()
 
@@ -237,3 +264,55 @@ def _dx(px: int):
     from PySide6.QtCore import QPoint
 
     return QPoint(px, 0)
+
+
+def _cover_screen(win: QWidget, screen) -> None:
+    """Recouvre entièrement un écran donné (fiable en multi-moniteur).
+
+    Une fenêtre frameless topmost à la géométrie exacte de l'écran couvre tout,
+    y compris la barre des tâches — plus fiable que showFullScreen() qui a
+    tendance à revenir sur l'écran principal.
+    """
+    geo = screen.geometry()
+    win.setGeometry(geo)
+    win.show()
+    if win.windowHandle() is not None:
+        win.windowHandle().setScreen(screen)
+    win.setGeometry(geo)
+    win.raise_()
+
+
+class SecondaryLockWindow(QWidget):
+    """Cache animé (sans carte) pour les écrans secondaires."""
+
+    def __init__(self, config: Config, primary: "LockWindow"):
+        super().__init__()
+        self.config = config
+        self._primary = primary
+        self._can_close = False
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
+        )
+        self.setCursor(Qt.CursorShape.BlankCursor)
+        self.anim = create_animation(
+            config.animation, config.anim_options(config.animation), parent=self
+        )
+
+    def allow_close(self) -> None:
+        self._can_close = True
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        self.anim.setGeometry(0, 0, self.width(), self.height())
+        super().resizeEvent(event)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self._primary.focus_and_show_card()
+            return
+        super().keyPressEvent(event)
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        if self._can_close:
+            event.accept()
+        else:
+            event.ignore()
