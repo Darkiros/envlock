@@ -69,8 +69,10 @@ QFrame#card {
     border: 1px solid #2a3242;
     border-radius: 18px;
 }
+/* Les enfants héritent sinon du fond opaque global -> barres noires. */
+QFrame#card > QLabel { background: transparent; border: none; }
 QLabel#cardTitle { font-size: 18px; font-weight: 600; color: #ffffff; }
-QLabel#cardError { color: #ff5c6c; font-size: 13px; }
+QLabel#cardError { color: #ff5c6c; font-size: 13px; min-height: 16px; }
 
 QLabel#pwStatus { font-size: 12px; color: #f0b429; }
 QLabel#pwStatus[ok="true"] { color: #3fb950; }

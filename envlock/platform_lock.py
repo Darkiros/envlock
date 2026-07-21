@@ -39,8 +39,10 @@ if os.name == "nt":
     # Codes de touches virtuelles
     VK_TAB = 0x09
     VK_ESCAPE = 0x1B
+    VK_SPACE = 0x20
     VK_LWIN = 0x5B
     VK_RWIN = 0x5C
+    VK_APPS = 0x5D
     VK_F4 = 0x73
     VK_CONTROL = 0x11
     VK_SHIFT = 0x10
@@ -74,12 +76,31 @@ if os.name == "nt":
     user32.CallNextHookEx.argtypes = [
         wintypes.HHOOK, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM
     ]
+    user32.UnhookWindowsHookEx.restype = wintypes.BOOL
     user32.UnhookWindowsHookEx.argtypes = [wintypes.HHOOK]
     user32.GetAsyncKeyState.restype = wintypes.SHORT
     user32.GetAsyncKeyState.argtypes = [ctypes.c_int]
 
+    # IMPORTANT : sans restype explicite, ctypes suppose c_int (32 bits) et
+    # tronque le HMODULE 64 bits -> SetWindowsHookExW échoue silencieusement.
+    kernel32.GetModuleHandleW.restype = wintypes.HMODULE
+    kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+    kernel32.SetThreadExecutionState.restype = wintypes.DWORD
+    kernel32.SetThreadExecutionState.argtypes = [wintypes.DWORD]
+
     def _is_down(vk: int) -> bool:
         return bool(user32.GetAsyncKeyState(vk) & 0x8000)
+
+    def _log(message: str) -> None:
+        """Trace dans %APPDATA%\\EnvLock\\lock.log (app sans console)."""
+        try:
+            from .config import config_dir
+
+            (config_dir() / "lock.log").open("a", encoding="utf-8").write(
+                message + "\n"
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     class WindowsLocker(BaseLocker):
         def __init__(self):
@@ -87,12 +108,17 @@ if os.name == "nt":
             self._proc = HOOKPROC(self._callback)  # gardé vivant
 
         def _callback(self, nCode, wParam, lParam):
-            if nCode == HC_ACTION:
-                kb = ctypes.cast(
-                    lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)
-                ).contents
-                if self._should_block(kb):
-                    return 1  # avale la frappe
+            # Toute exception ici serait avalée par ctypes et laisserait passer
+            # les touches : on protège donc le corps du callback.
+            try:
+                if nCode == HC_ACTION:
+                    kb = ctypes.cast(
+                        lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)
+                    ).contents
+                    if self._should_block(kb):
+                        return 1  # avale la frappe
+            except Exception:  # noqa: BLE001 - ne jamais planter le hook
+                pass
             return user32.CallNextHookEx(None, nCode, wParam, lParam)
 
         @staticmethod
@@ -102,15 +128,21 @@ if os.name == "nt":
             ctrl = _is_down(VK_CONTROL)
             shift = _is_down(VK_SHIFT)
 
-            if vk in (VK_LWIN, VK_RWIN):  # touche Windows
+            if vk in (VK_LWIN, VK_RWIN):  # touche Windows (Démarrer, Win+X…)
+                return True
+            if vk == VK_APPS:  # touche menu contextuel
                 return True
             if vk == VK_TAB and alt:  # Alt+Tab
                 return True
-            if vk == VK_ESCAPE and (alt or ctrl):  # Alt/Ctrl+Échap
+            if vk == VK_TAB and ctrl:  # Ctrl+Tab (basculement)
+                return True
+            if vk == VK_ESCAPE and (alt or ctrl):  # Alt/Ctrl+Échap (Démarrer)
                 return True
             if vk == VK_F4 and alt:  # Alt+F4
                 return True
-            if vk == VK_ESCAPE and ctrl and shift:  # Ctrl+Maj+Échap
+            if vk == VK_SPACE and alt:  # Alt+Espace (menu système)
+                return True
+            if vk == VK_ESCAPE and ctrl and shift:  # Ctrl+Maj+Échap (Task Mgr)
                 return True
             return False
 
@@ -121,6 +153,13 @@ if os.name == "nt":
             self._hook = user32.SetWindowsHookExW(
                 WH_KEYBOARD_LL, self._proc, hmod, 0
             )
+            if not self._hook:
+                _log(
+                    "ECHEC SetWindowsHookExW (GetLastError=%d) — le blocage "
+                    "clavier est INACTIF." % ctypes.get_last_error()
+                )
+            else:
+                _log("Hook clavier actif.")
             # Empêche veille écran + système tant qu'on est verrouillé.
             kernel32.SetThreadExecutionState(
                 ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED

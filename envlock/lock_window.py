@@ -131,6 +131,19 @@ class LockWindow(QWidget):
         self.activateWindow()
         self._locker.start()
         self.setFocus()
+        # Watchdog : garde la fenêtre au premier plan si une autre app tente
+        # de passer devant (ex. notification, fenêtre lancée avant le lock).
+        self._watchdog = QTimer(self)
+        self._watchdog.timeout.connect(self._keep_on_top)
+        self._watchdog.start(400)
+
+    def _keep_on_top(self) -> None:
+        if self._unlocking or not self.isVisible():
+            return
+        self.raise_()
+        # Ne pas voler le focus au champ mot de passe quand la carte est ouverte.
+        if not self.card.isVisible() and not self.isActiveWindow():
+            self.activateWindow()
 
     def _update_clock(self) -> None:
         now = QTime.currentTime()
