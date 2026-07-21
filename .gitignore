@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# PyInstaller
+build/
+dist/
+*.spec.bak
+
+# Config locale de l'app (contient le hash du mot de passe)
+config.json
+
+# OS / éditeurs
+.DS_Store
+.idea/
+.vscode/
