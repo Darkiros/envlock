@@ -234,7 +234,11 @@ class LockWindow(QWidget):
     def _do_unlock(self) -> None:
         self._unlocking = True
         self._locker.stop()
+        if hasattr(self, "_watchdog"):
+            self._watchdog.stop()
+        self.anim.stop()
         for sec in getattr(self, "_secondaries", []):
+            sec.anim.stop()
             sec.allow_close()
             sec.close()
         self._secondaries = []

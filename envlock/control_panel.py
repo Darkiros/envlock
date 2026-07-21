@@ -30,7 +30,13 @@ class PreviewFrame(QFrame):
 
     def show_animation(self, key: str, options: dict) -> None:
         if self._anim is not None:
+            # Ordre important : couper le timer, détacher, PUIS supprimer,
+            # sinon un tick peut arriver sur un widget en destruction (crash).
+            self._anim.stop()
+            self._anim.hide()
+            self._anim.setParent(None)
             self._anim.deleteLater()
+            self._anim = None
         self._anim = create_animation(key, options, parent=self)
         self._anim.setGeometry(0, 0, self.width(), self.height())
         self._anim.show()

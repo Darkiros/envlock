@@ -22,11 +22,11 @@ DEFAULTS: dict[str, Any] = {
     "clock": {"show": True},
     "animations": {
         "sphere": {
-            "count": 130,
-            "link_distance": 0.46,
+            "count": 170,
+            "link_distance": 0.42,
             "speed": 0.006,
-            "color": "#6fb3ff",
-            "background": "#05070d",
+            "color": "#63d0ff",
+            "background": "#04060c",
         },
         "particles": {
             "count": 90,

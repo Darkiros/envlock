@@ -91,17 +91,6 @@ if os.name == "nt":
     def _is_down(vk: int) -> bool:
         return bool(user32.GetAsyncKeyState(vk) & 0x8000)
 
-    def _log(message: str) -> None:
-        """Trace dans %APPDATA%\\EnvLock\\lock.log (app sans console)."""
-        try:
-            from .config import config_dir
-
-            (config_dir() / "lock.log").open("a", encoding="utf-8").write(
-                message + "\n"
-            )
-        except Exception:  # noqa: BLE001
-            pass
-
     class WindowsLocker(BaseLocker):
         def __init__(self):
             self._hook = None
@@ -153,13 +142,6 @@ if os.name == "nt":
             self._hook = user32.SetWindowsHookExW(
                 WH_KEYBOARD_LL, self._proc, hmod, 0
             )
-            if not self._hook:
-                _log(
-                    "ECHEC SetWindowsHookExW (GetLastError=%d) — le blocage "
-                    "clavier est INACTIF." % ctypes.get_last_error()
-                )
-            else:
-                _log("Hook clavier actif.")
             # Empêche veille écran + système tant qu'on est verrouillé.
             kernel32.SetThreadExecutionState(
                 ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED

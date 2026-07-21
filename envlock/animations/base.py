@@ -29,6 +29,11 @@ class BaseAnimation(QWidget):
         self._timer.start(33)  # ~30 fps
 
     # ---- cycle de vie ------------------------------------------------
+    def stop(self) -> None:
+        """Arrête le timer AVANT toute destruction (évite qu'un tick se
+        déclenche sur un widget en cours de suppression -> crash natif)."""
+        self._timer.stop()
+
     def _tick(self) -> None:
         if not self._seeded and self.width() > 1 and self.height() > 1:
             self.seed()
@@ -51,10 +56,16 @@ class BaseAnimation(QWidget):
         """Fait avancer l'animation d'une frame."""
 
     def paintEvent(self, event) -> None:  # noqa: N802 (Qt)
+        # Une exception dans un override Qt (paintEvent) peut faire planter
+        # l'application entière : on la contient donc systématiquement.
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.render_frame(painter)
-        painter.end()
+        try:
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            self.render_frame(painter)
+        except Exception:  # noqa: BLE001
+            pass
+        finally:
+            painter.end()
 
     def render_frame(self, painter: QPainter) -> None:
         painter.fillRect(self.rect(), QColor("#000000"))
