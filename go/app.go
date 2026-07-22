@@ -41,6 +41,32 @@ func (a *App) SaveConfig(c Config) error {
 	return c.save()
 }
 
+func (a *App) SetAnimation(name string) error {
+	a.config.Animation = name
+	return a.config.save()
+}
+
+func (a *App) SetClock(on bool) error {
+	a.config.Clock = on
+	return a.config.save()
+}
+
+// MonitorFrac : géométrie d'un moniteur exprimée en fractions [0..1] du
+// bureau virtuel (indépendant du DPI côté frontend).
+type MonitorFrac struct {
+	Fx      float64 `json:"fx"`
+	Fy      float64 `json:"fy"`
+	Fw      float64 `json:"fw"`
+	Fh      float64 `json:"fh"`
+	Primary bool    `json:"primary"`
+}
+
+// GetMonitors renvoie la disposition des écrans (pour dessiner un orbe par
+// moniteur et centrer le prompt sur l'écran principal).
+func (a *App) GetMonitors() []MonitorFrac {
+	return monitorFractions()
+}
+
 // ---- verrouillage ---------------------------------------------------
 
 // Lock étend la fenêtre sur tout le bureau virtuel, la met au premier plan,

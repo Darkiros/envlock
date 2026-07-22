@@ -24,6 +24,8 @@ var (
 	pPeekMessageW         = user32.NewProc("PeekMessageW")
 	pTranslateMessage     = user32.NewProc("TranslateMessage")
 	pDispatchMessageW     = user32.NewProc("DispatchMessageW")
+	pEnumDisplayMonitors  = user32.NewProc("EnumDisplayMonitors")
+	pGetMonitorInfoW      = user32.NewProc("GetMonitorInfoW")
 	pSetThreadExecutionSt = kernel32.NewProc("SetThreadExecutionState")
 )
 
@@ -181,6 +183,52 @@ func (l *Locker) worker() {
 func metric(i int) int32 {
 	r, _, _ := pGetSystemMetrics.Call(uintptr(i))
 	return int32(r)
+}
+
+type monitorInfo struct {
+	CbSize    uint32
+	RcMonitor rect
+	RcWork    rect
+	DwFlags   uint32
+}
+
+// Accumulateur pour EnumDisplayMonitors (appel synchrone -> pas de course).
+var enumRects []rect
+var enumPrimary []bool
+
+var monEnumProc = syscall.NewCallback(func(hMon, hdc, lprc, data uintptr) uintptr {
+	var mi monitorInfo
+	mi.CbSize = uint32(unsafe.Sizeof(mi))
+	if r, _, _ := pGetMonitorInfoW.Call(hMon, uintptr(unsafe.Pointer(&mi))); r != 0 {
+		enumRects = append(enumRects, mi.RcMonitor)
+		enumPrimary = append(enumPrimary, mi.DwFlags&0x1 != 0) // MONITORINFOF_PRIMARY
+	}
+	return 1 // continuer l'énumération
+})
+
+func monitorFractions() []MonitorFrac {
+	vx, vy := float64(metric(smXVirtual)), float64(metric(smYVirtual))
+	vw, vh := float64(metric(smCXVirtual)), float64(metric(smCYVirtual))
+	if vw <= 0 || vh <= 0 {
+		return []MonitorFrac{{Fx: 0, Fy: 0, Fw: 1, Fh: 1, Primary: true}}
+	}
+	enumRects = nil
+	enumPrimary = nil
+	pEnumDisplayMonitors.Call(0, 0, monEnumProc, 0)
+	out := make([]MonitorFrac, 0, len(enumRects))
+	for i, r := range enumRects {
+		out = append(out, MonitorFrac{
+			Fx:      (float64(r.Left) - vx) / vw,
+			Fy:      (float64(r.Top) - vy) / vh,
+			Fw:      float64(r.Right-r.Left) / vw,
+			Fh:      float64(r.Bottom-r.Top) / vh,
+			Primary: enumPrimary[i],
+		})
+	}
+	if len(out) == 0 {
+		out = append(out, MonitorFrac{Fx: 0, Fy: 0, Fw: 1, Fh: 1, Primary: true})
+	}
+	return out
 }
 
 func (l *Locker) doEnter() {
