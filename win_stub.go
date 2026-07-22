@@ -4,14 +4,13 @@ package main
 
 // Stub non-Windows : l'UI s'affiche mais le blocage clavier / anti-veille et le
 // passage plein écran multi-moniteur restent à implémenter (X11/Wayland).
-type Locker struct {
-	fgRestore  uintptr
-	hideOnExit bool
-}
+type Locker struct{}
 
 func newLocker() *Locker { return &Locker{} }
 
-func captureForeground() uintptr { return 0 }
+func captureForeground() uintptr     { return 0 }
+func selfWindow() uintptr            { return 0 }
+func bringToForeground(hwnd uintptr) {}
 
 func (l *Locker) enter() {}
 func (l *Locker) exit()  {}

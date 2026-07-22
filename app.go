@@ -12,8 +12,9 @@ type App struct {
 	config           Config
 	locker           *Locker
 	locked           bool
-	hidden           bool    // fenêtre réduite dans la barre de notification
-	lockedFromHidden bool    // l'app était-elle dans la barre au moment du lock ?
+	hidden           bool    // fenêtre cachée dans la zone de notification (tray)
+	lockedFromHidden bool    // l'app était-elle dans le tray au moment du lock ?
+	lockedFromSelf   bool    // EnvLock était-il la fenêtre active au moment du lock ?
 	prevForeground   uintptr // fenêtre au premier plan avant le verrouillage
 }
 
@@ -95,9 +96,11 @@ func (a *App) GetMonitors() []MonitorFrac {
 // installe le hook clavier et empêche la veille.
 func (a *App) Lock() {
 	a.prevForeground = captureForeground() // AVANT d'afficher/voler le focus
+	a.lockedFromSelf = a.prevForeground != 0 && a.prevForeground == selfWindow()
 	a.lockedFromHidden = a.hidden
 	a.locked = true
 	wailsruntime.WindowShow(a.ctx)
+	wailsruntime.WindowUnminimise(a.ctx) // s'assurer que le lock s'affiche
 	a.hidden = false
 	a.locker.enter()
 }
@@ -106,13 +109,22 @@ func (a *App) Lock() {
 // verrouillage a été déclenché alors que l'app était dans la barre, on y
 // retourne au lieu d'afficher le panneau.
 func (a *App) Unlock() {
-	a.locker.fgRestore = a.prevForeground // rendre le premier plan à l'appli d'avant
-	a.locker.hideOnExit = a.lockedFromHidden
-	a.locker.exit()
+	a.locker.exit() // synchrone : le dé-plein-écran est terminé au retour
 	a.locked = false
-	if a.lockedFromHidden {
+	switch {
+	case a.lockedFromHidden:
+		// Était dans le tray -> y retourner.
 		a.hidden = true
 		wailsruntime.WindowHide(a.ctx)
+		bringToForeground(a.prevForeground)
+	case !a.lockedFromSelf:
+		// Était minimisée / en arrière-plan pendant qu'on bossait ailleurs ->
+		// re-minimiser et rendre le premier plan à l'appli précédente.
+		wailsruntime.WindowMinimise(a.ctx)
+		bringToForeground(a.prevForeground)
+	default:
+		// C'était EnvLock la fenêtre active -> le panneau reste devant.
+		wailsruntime.WindowShow(a.ctx)
 	}
 }
 

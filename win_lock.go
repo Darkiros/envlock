@@ -302,19 +302,24 @@ func (l *Locker) doExit() {
 	if l.hwnd != 0 {
 		w := l.prev.Right - l.prev.Left
 		h := l.prev.Bottom - l.prev.Top
+		// Sans SWP_NOACTIVATE ici : c'est Unlock() (côté Go/Wails) qui décide de
+		// l'état final (panneau devant / minimisé / tray) juste après.
 		pSetWindowPos.Call(l.hwnd, hwndNoTopmost,
 			uintptr(l.prev.Left), uintptr(l.prev.Top),
-			uintptr(w), uintptr(h), swpShowWindow)
+			uintptr(w), uintptr(h), swpShowWindow|swpNoActivate)
 	}
 	pSetThreadExecutionSt.Call(esContinuous)
-	// Rendre la main à la fenêtre d'avant le verrouillage.
-	if l.fgRestore != 0 && l.fgRestore != l.hwnd {
-		// On était sur une AUTRE fenêtre : SetForegroundWindow vers un autre
-		// process est souvent bloqué -> on minimise EnvLock pour qu'il cède le
-		// premier plan (sauf s'il repart dans la barre), + réactivation explicite.
-		if !l.hideOnExit {
-			pShowWindow.Call(l.hwnd, swMinimize)
-		}
-		restoreForeground(l.fgRestore)
+	if l.exitDone != nil {
+		close(l.exitDone)
 	}
 }
+
+// selfWindow renvoie le handle de la fenêtre principale Wails (titre "EnvLock").
+func selfWindow() uintptr {
+	title, _ := syscall.UTF16PtrFromString(WindowTitle)
+	r, _, _ := pFindWindowW.Call(0, uintptr(unsafe.Pointer(title)))
+	return r
+}
+
+// bringToForeground redonne le premier plan à une fenêtre (appli d'avant le lock).
+func bringToForeground(hwnd uintptr) { restoreForeground(hwnd) }
