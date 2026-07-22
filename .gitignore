@@ -22,3 +22,9 @@ config.json
 # même si la règle générique 'dist/' ci-dessus voudrait l'exclure.
 !go/frontend/dist/
 !go/frontend/dist/**
+
+# Icône de l'app Wails à versionner (sinon exclue par 'build/'), mais on garde
+# la sortie de build (go/build/bin) ignorée.
+!go/build/
+!go/build/appicon.png
+go/build/bin/
