@@ -257,9 +257,12 @@ func (l *Locker) createWindow() {
 	wc.HInstance = hInst
 	wc.LpszClassName = cls
 	pRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc)))
+	// Titre DISTINCT de la fenêtre Wails ("EnvLock") : sinon FindWindow peut
+	// retrouver cette fenêtre cachée au lieu de la vraie -> le plein écran
+	// s'appliquerait à une fenêtre invisible.
 	h, _, _ := pCreateWindowExW.Call(
 		0, uintptr(unsafe.Pointer(cls)),
-		uintptr(unsafe.Pointer(utf16Ptr("EnvLock"))),
+		uintptr(unsafe.Pointer(utf16Ptr("EnvLockHiddenMsgWindow"))),
 		0, 0, 0, 0, 0, 0, 0, hInst, 0,
 	)
 	l.msgHwnd = h

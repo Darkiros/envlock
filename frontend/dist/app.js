@@ -120,6 +120,11 @@
     if ($("lock").classList.contains("active")) return; // déjà verrouillé
     if (!(await App().HasPassword())) { refreshPassword(); return; }
 
+    // Bascule immédiate sur l'écran sombre (évite le flash du panneau au raccourci).
+    showView("lock");
+    hidePwCard();
+    $("lock").style.cursor = "none";
+
     // Un calque animé par moniteur + overlay (horloge/prompt) sur l'écran principal.
     const mons = await App().GetMonitors();
     const layers = $("layers");
@@ -150,9 +155,6 @@
     updateClock();
     clockTimer = setInterval(updateClock, 1000);
 
-    showView("lock");
-    hidePwCard();
-    $("lock").style.cursor = "none"; // masque la souris pendant l'animation
     await App().Lock(); // Go : plein écran multi-moniteur + hook clavier + anti-veille
     setTimeout(() => window.focus(), 60);
   }
