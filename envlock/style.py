@@ -9,16 +9,26 @@ QLabel#title { font-size: 34px; font-weight: 700; color: #ffffff; }
 QLabel#subtitle { font-size: 14px; color: #8b93a7; }
 QLabel#section { color: #808aa0; letter-spacing: 2px; }
 
-QComboBox, QLineEdit {
+QComboBox, QLineEdit, QKeySequenceEdit {
     background-color: #171b24;
     border: 1px solid #262c3a;
     border-radius: 10px;
     padding: 10px 12px;
     font-size: 14px;
+    min-height: 20px;
     color: #e6e9ef;
     selection-background-color: #3b82f6;
 }
-QComboBox:focus, QLineEdit:focus { border: 1px solid #3b82f6; }
+QComboBox:focus, QLineEdit:focus, QKeySequenceEdit:focus { border: 1px solid #3b82f6; }
+
+QScrollArea { background: transparent; border: none; }
+QWidget#bottomBar { background-color: #0b0f17; border-top: 1px solid #1c2230; }
+
+QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; }
+QScrollBar::handle:vertical { background: #2a3242; border-radius: 5px; min-height: 30px; }
+QScrollBar::handle:vertical:hover { background: #3a445a; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
 QComboBox::drop-down { border: none; width: 28px; }
 QComboBox QAbstractItemView {
     background-color: #171b24;

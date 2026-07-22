@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -54,7 +55,8 @@ class ControlPanel(QWidget):
         self.config = config
         self._force_quit = False
         self.setWindowTitle("EnvLock — Panneau de contrôle")
-        self.setMinimumSize(760, 620)
+        self.setMinimumSize(720, 460)
+        self.resize(780, 680)
         self._build()
         self._refresh_preview()
         self._refresh_password_state()
@@ -78,8 +80,21 @@ class ControlPanel(QWidget):
 
     # ------------------------------------------------------------------
     def _build(self) -> None:
-        root = QVBoxLayout(self)
-        root.setContentsMargins(28, 24, 28, 24)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        # Zone défilable : les champs gardent leur taille, on scrolle plutôt
+        # que d'écraser les widgets quand la fenêtre est petite.
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        content.setMinimumWidth(680)
+        outer.addWidget(scroll, 1)
+
+        root = QVBoxLayout(content)
+        root.setContentsMargins(28, 24, 28, 18)
         root.setSpacing(18)
 
         title = QLabel("EnvLock")
@@ -180,14 +195,22 @@ class ControlPanel(QWidget):
 
         row.addLayout(settings, 1)
         row.addLayout(preview_col, 0)
-        root.addLayout(row, 1)
+        root.addLayout(row, 0)
+        root.addStretch(1)
 
-        # ---- bas : bouton verrouiller --------------------------------
+        scroll.setWidget(content)
+
+        # ---- barre du bas fixe : bouton verrouiller (toujours visible) ----
+        bottom = QWidget()
+        bottom.setObjectName("bottomBar")
+        bl = QVBoxLayout(bottom)
+        bl.setContentsMargins(28, 12, 28, 16)
         self.lock_btn = QPushButton("🔒  Verrouiller maintenant")
         self.lock_btn.setObjectName("lockButton")
         self.lock_btn.setMinimumHeight(52)
         self.lock_btn.clicked.connect(self._on_lock)
-        root.addWidget(self.lock_btn)
+        bl.addWidget(self.lock_btn)
+        outer.addWidget(bottom, 0)
 
     # ------------------------------------------------------------------
     def _on_anim_changed(self) -> None:
