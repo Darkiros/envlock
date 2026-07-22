@@ -1,0 +1,15 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "EnvLock",
+  "outputfilename": "EnvLock",
+  "frontend:install": "",
+  "frontend:build": "",
+  "author": {
+    "name": "Romain"
+  },
+  "info": {
+    "productName": "EnvLock",
+    "productVersion": "1.0.0",
+    "comments": "Verrouilleur d'environnement (Go/Wails)"
+  }
+}

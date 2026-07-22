@@ -1,0 +1,12 @@
+//go:build !windows
+
+package main
+
+// Stub non-Windows : l'UI s'affiche mais le blocage clavier / anti-veille et le
+// passage plein écran multi-moniteur restent à implémenter (X11/Wayland).
+type Locker struct{}
+
+func newLocker() *Locker { return &Locker{} }
+
+func (l *Locker) enter() {}
+func (l *Locker) exit()  {}
