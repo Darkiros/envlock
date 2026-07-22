@@ -26,7 +26,13 @@ var (
 	pDispatchMessageW     = user32.NewProc("DispatchMessageW")
 	pEnumDisplayMonitors  = user32.NewProc("EnumDisplayMonitors")
 	pGetMonitorInfoW      = user32.NewProc("GetMonitorInfoW")
+	pGetWindowThreadPID   = user32.NewProc("GetWindowThreadProcessId")
+	pAttachThreadInput    = user32.NewProc("AttachThreadInput")
+	pBringWindowToTop     = user32.NewProc("BringWindowToTop")
+	pSetFocus             = user32.NewProc("SetFocus")
+	pGetWindow            = user32.NewProc("GetWindow")
 	pSetThreadExecutionSt = kernel32.NewProc("SetThreadExecutionState")
+	pGetCurrentThreadId   = kernel32.NewProc("GetCurrentThreadId")
 )
 
 const (
@@ -130,6 +136,32 @@ func metric(i int) int32 {
 	return int32(r)
 }
 
+// forceFocus donne réellement le focus clavier à la fenêtre ET à son enfant
+// WebView. Sans ça, il faut cliquer avant que les frappes soient reçues.
+// AttachThreadInput est nécessaire pour que SetFocus/SetForegroundWindow
+// aboutissent depuis un autre thread que celui de la fenêtre.
+func forceFocus(hwnd uintptr) {
+	if hwnd == 0 {
+		return
+	}
+	target, _, _ := pGetWindowThreadPID.Call(hwnd, 0)
+	cur, _, _ := pGetCurrentThreadId.Call()
+	attached := false
+	if target != cur {
+		r, _, _ := pAttachThreadInput.Call(cur, target, 1)
+		attached = r != 0
+	}
+	pBringWindowToTop.Call(hwnd)
+	pSetForegroundWindow.Call(hwnd)
+	pSetFocus.Call(hwnd)
+	if child, _, _ := pGetWindow.Call(hwnd, 5 /* GW_CHILD */); child != 0 {
+		pSetFocus.Call(child)
+	}
+	if attached {
+		pAttachThreadInput.Call(cur, target, 0)
+	}
+}
+
 // setTaskMgrDisabled (dés)active le Gestionnaire des tâches via la policy
 // per-utilisateur (HKCU, sans droits admin). Ferme la voie de kill la plus
 // courante depuis l'écran Ctrl+Alt+Suppr. Réversible.
@@ -224,6 +256,7 @@ func (l *Locker) doEnter() {
 	}
 	pSetThreadExecutionSt.Call(esContinuous | esSystemRequired | esDisplayRequired)
 	setTaskMgrDisabled(true)
+	forceFocus(l.hwnd) // focus clavier immédiat (sinon il faut cliquer)
 	l.startWatch()
 }
 
