@@ -35,12 +35,15 @@ jobs:
       - name: Tidy modules
         run: go mod tidy
 
-      - name: Build
+      - name: Build (release)
         run: wails build -platform windows/amd64 -s -skipbindings -o EnvLock.exe
+
+      - name: Build (debug console)
+        run: wails build -debug -devtools -platform windows/amd64 -s -skipbindings -o EnvLock-debug.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: EnvLock-go-windows
-          path: go/build/bin/EnvLock.exe
+          path: go/build/bin/*.exe
           if-no-files-found: error

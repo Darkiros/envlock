@@ -16,6 +16,7 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.locker = newLocker()
+	logf("startup ok — webview initialisée")
 }
 
 // ---- config / mot de passe (bindings JS) ----------------------------

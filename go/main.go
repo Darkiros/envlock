@@ -16,6 +16,7 @@ var assets embed.FS
 const WindowTitle = "EnvLock"
 
 func main() {
+	logf("main: démarrage du process")
 	app := NewApp()
 
 	err := wails.Run(&options.App{
@@ -37,6 +38,7 @@ func main() {
 		},
 	})
 	if err != nil {
+		logf("wails.Run erreur: %s", err.Error())
 		println("Error:", err.Error())
 	}
 }
