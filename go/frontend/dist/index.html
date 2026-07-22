@@ -13,6 +13,15 @@
   *{box-sizing:border-box;margin:0;padding:0;}
   html,body{height:100%;}
   body{background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden;}
+
+  /* Scrollbar assortie au thème (WebView2 = Chromium) */
+  *{scrollbar-width:thin;scrollbar-color:#2a3242 transparent;}
+  *::-webkit-scrollbar{width:10px;height:10px;}
+  *::-webkit-scrollbar-track{background:transparent;}
+  *::-webkit-scrollbar-thumb{background:#2a3242;border-radius:5px;border:2px solid transparent;background-clip:padding-box;}
+  *::-webkit-scrollbar-thumb:hover{background:#3a445a;background-clip:padding-box;}
+
+  .previewbox canvas{width:100%;height:100%;display:block;}
   .view{position:fixed;inset:0;display:none;}
   .view.active{display:flex;flex-direction:column;}
 
@@ -119,7 +128,7 @@
       </div>
       <div>
         <h2>Aperçu</h2>
-        <div class="previewbox"><canvas id="preview"></canvas></div>
+        <div class="previewbox" id="previewHost"></div>
         <div class="card" style="margin-top:16px;">
           <h2>Options</h2>
           <div class="status">Barre de notification & raccourci global</div>

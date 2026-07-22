@@ -37,7 +37,13 @@
 
   function restartPreview() {
     if (previewAnim) previewAnim.stop();
-    previewAnim = createAnimation(config.animation, $("preview"), sphereOpts());
+    // Canvas neuf à chaque fois -> surface GPU propre (évite le crash du
+    // renderer WebView2 quand on réutilise le canvas entre animations).
+    const host = $("previewHost");
+    host.innerHTML = "";
+    const c = document.createElement("canvas");
+    host.appendChild(c);
+    previewAnim = createAnimation(config.animation, c, sphereOpts());
   }
 
   async function onAnimChange() {
