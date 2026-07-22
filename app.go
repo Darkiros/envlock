@@ -107,6 +107,7 @@ func (a *App) Lock() {
 // retourne au lieu d'afficher le panneau.
 func (a *App) Unlock() {
 	a.locker.fgRestore = a.prevForeground // rendre le premier plan à l'appli d'avant
+	a.locker.hideOnExit = a.lockedFromHidden
 	a.locker.exit()
 	a.locked = false
 	if a.lockedFromHidden {

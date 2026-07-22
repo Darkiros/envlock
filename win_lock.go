@@ -31,8 +31,14 @@ var (
 	pBringWindowToTop     = user32.NewProc("BringWindowToTop")
 	pSetFocus             = user32.NewProc("SetFocus")
 	pGetWindow            = user32.NewProc("GetWindow")
+	pShowWindow           = user32.NewProc("ShowWindow")
 	pSetThreadExecutionSt = kernel32.NewProc("SetThreadExecutionState")
 	pGetCurrentThreadId   = kernel32.NewProc("GetCurrentThreadId")
+)
+
+const (
+	swHide     = 0
+	swMinimize = 6
 )
 
 const (
@@ -301,8 +307,14 @@ func (l *Locker) doExit() {
 			uintptr(w), uintptr(h), swpShowWindow)
 	}
 	pSetThreadExecutionSt.Call(esContinuous)
-	// Rend le premier plan à la fenêtre qui l'avait avant le verrouillage.
-	if l.fgRestore != 0 {
+	// Rendre la main à la fenêtre d'avant le verrouillage.
+	if l.fgRestore != 0 && l.fgRestore != l.hwnd {
+		// On était sur une AUTRE fenêtre : SetForegroundWindow vers un autre
+		// process est souvent bloqué -> on minimise EnvLock pour qu'il cède le
+		// premier plan (sauf s'il repart dans la barre), + réactivation explicite.
+		if !l.hideOnExit {
+			pShowWindow.Call(l.hwnd, swMinimize)
+		}
 		restoreForeground(l.fgRestore)
 	}
 }

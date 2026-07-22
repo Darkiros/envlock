@@ -114,14 +114,15 @@ type notifyIconData struct {
 // Locker : intégration Win32 sur une goroutine dédiée (fenêtre cachée +
 // boucle de messages, indispensable au hook clavier, au tray et au raccourci).
 type Locker struct {
-	msgHwnd   uintptr
-	hwnd      uintptr // fenêtre Wails (cible du plein écran)
-	prev      rect
-	hook      uintptr
-	ready     chan struct{}
-	tooltip   string
-	stopWatch chan struct{}
-	fgRestore uintptr // fenêtre à remettre au premier plan au déverrouillage
+	msgHwnd    uintptr
+	hwnd       uintptr // fenêtre Wails (cible du plein écran)
+	prev       rect
+	hook       uintptr
+	ready      chan struct{}
+	tooltip    string
+	stopWatch  chan struct{}
+	fgRestore  uintptr // fenêtre à remettre au premier plan au déverrouillage
+	hideOnExit bool    // l'app repart dans la barre au déverrouillage
 }
 
 var theLocker *Locker
