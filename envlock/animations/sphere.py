@@ -1,9 +1,20 @@
-"""Animation « sphère de particules » (plexus sphere) qui tourne en 3D.
+"""Animation « orbe de particules » façon JARVIS.
 
-Des points répartis sur une sphère (répartition de Fibonacci) tournent lentement ;
-les points proches sont reliés par des traits. Rendu en blending additif avec
-dégradé de profondeur (bleu profond à l'arrière → cyan lumineux à l'avant) et
-halos, pour l'effet « globe réseau » lumineux.
+Des particules réparties sur une sphère (spirale de Fibonacci) sont déplacées
+radialement par des vagues (déplacement pseudo-ondulatoire), le tout en rotation
+lente avec une légère pulsation « d'écoute ». Rendu en blending additif (glow)
+avec dégradé de profondeur cyan. Portage direct de l'aperçu navigateur.
+
+Réglages (config → animations.sphere) :
+    count       nombre de particules
+    amp         amplitude des vagues
+    wave_speed  vitesse des vagues
+    rot_speed   vitesse de rotation (rad/s)
+    dot_size    taille de base des points
+    hue         teinte (0-360, 193 = cyan)
+    pulse       intensité de la pulsation d'écoute
+    lines       True pour superposer un maillage plexus
+    background  couleur de fond
 """
 from __future__ import annotations
 
@@ -17,112 +28,108 @@ from .base import BaseAnimation
 
 class SphereAnimation(BaseAnimation):
     key = "sphere"
-    label = "Sphère de particules"
+    label = "Orbe de particules"
 
     def seed(self) -> None:
-        count = int(self.options.get("count", 170))
-        if min(self.width(), self.height()) < 240:  # aperçu = moins de points
-            count = max(70, count // 2)
+        count = int(self.options.get("count", 800))
+        if min(self.width(), self.height()) < 260:  # aperçu plus léger
+            count = max(300, count // 2)
 
-        self.pts: list[tuple[float, float, float]] = []
+        self.pts: list[tuple[float, float, float, float]] = []
         ga = math.pi * (3.0 - math.sqrt(5.0))  # angle d'or
         for i in range(count):
-            y = 1 - (i / max(1, count - 1)) * 2  # de 1 à -1
+            y = 1 - (i / max(1, count - 1)) * 2
             r = math.sqrt(max(0.0, 1 - y * y))
             theta = ga * i
-            x = math.cos(theta) * r
-            z = math.sin(theta) * r
-            # Rayon quasi constant + rares satellites proches (arcs externes).
-            rad = random.uniform(0.94, 1.04)
-            if random.random() < 0.08:
-                rad = random.uniform(1.08, 1.22)
-            self.pts.append((x * rad, y * rad, z * rad))
+            self.pts.append(
+                (math.cos(theta) * r, y, math.sin(theta) * r, random.uniform(0, 6.283))
+            )
 
-        # Adjacence figée : la rotation conserve les distances 3D.
-        link = float(self.options.get("link_distance", 0.42))
+        # Maillage optionnel (distances conservées par la rotation).
         self.edges: list[tuple[int, int, float]] = []
-        n = len(self.pts)
-        for i in range(n):
-            ax, ay, az = self.pts[i]
-            for j in range(i + 1, n):
-                bx, by, bz = self.pts[j]
-                d = math.sqrt((ax - bx) ** 2 + (ay - by) ** 2 + (az - bz) ** 2)
-                if d < link:
-                    self.edges.append((i, j, 1.0 - d / link))
-
-    # -- couleurs de profondeur ----------------------------------------
-    def _depth_color(self, base: QColor, depth: float, alpha: int) -> QColor:
-        # Arrière : bleu sombre. Avant : cyan clair proche du blanc.
-        r = int(30 + (base.red() + 90 - 30) * depth)
-        g = int(70 + (base.green() + 60 - 70) * depth)
-        b = int(120 + (min(255, base.blue() + 20) - 120) * depth)
-        return QColor(min(255, r), min(255, g), min(255, b), alpha)
+        if bool(self.options.get("lines", False)):
+            link = 0.34
+            n = len(self.pts)
+            for i in range(n):
+                ax, ay, az, _ = self.pts[i]
+                for j in range(i + 1, n):
+                    bx, by, bz, _ = self.pts[j]
+                    d = math.sqrt((ax - bx) ** 2 + (ay - by) ** 2 + (az - bz) ** 2)
+                    if d < link:
+                        self.edges.append((i, j, 1.0 - d / link))
 
     def render_frame(self, painter: QPainter) -> None:
-        painter.fillRect(self.rect(), self.bg_color("#04060c"))
-        base = QColor(self.options.get("color", "#63d0ff"))
-        speed = float(self.options.get("speed", 0.006))
+        painter.fillRect(self.rect(), self.bg_color("#05070d"))
+
+        hue = float(self.options.get("hue", 193)) / 360.0
+        amp = float(self.options.get("amp", 0.20))
+        ws = float(self.options.get("wave_speed", 1.0))
+        rot = float(self.options.get("rot_speed", 0.35))
+        dot = float(self.options.get("dot_size", 1.7))
+        pulse_amt = float(self.options.get("pulse", 0.15))
 
         w, h = self.width(), self.height()
         cx, cy = w / 2.0, h / 2.0
-        radius = min(w, h) * 0.38
+        radius = min(w, h) * 0.34
+        size_scale = max(0.8, min(w, h) / 800.0)
 
-        yaw = self._frame * speed
-        pitch = 0.42 + 0.09 * math.sin(self._frame * 0.004)
+        t = self._frame / 30.0  # secondes (~30 fps)
+        yaw = t * rot
+        pitch = 0.40 + 0.08 * math.sin(t * 0.3)
         cyw, syw = math.cos(yaw), math.sin(yaw)
         cp, sp = math.cos(pitch), math.sin(pitch)
-        breathe = 1.0 + 0.025 * math.sin(self._frame * 0.02)
+        pulse = 1.0 + pulse_amt * max(0.0, math.sin(t * 1.3)) * (
+            0.6 + 0.4 * math.sin(t * 0.5)
+        )
 
-        # Projection de tous les points.
+        # Projection.
         proj = []
-        for (x, y, z) in self.pts:
+        for (x0, y0, z0, ph) in self.pts:
+            n = (
+                0.6 * math.sin(4 * y0 + t * ws)
+                + 0.4 * math.cos(5 * x0 - t * ws * 0.8)
+                + 0.5 * math.sin(6 * z0 + t * ws * 1.3)
+            )
+            rr = 1.0 + amp * n * pulse
+            x, y, z = x0 * rr, y0 * rr, z0 * rr
             rx = x * cyw + z * syw
             rz = -x * syw + z * cyw
             ry = y * cp - rz * sp
             rz = y * sp + rz * cp
-            depth = min(1.0, max(0.0, (rz + 1.3) / 2.6))  # 0 loin, 1 proche
+            depth = min(1.0, max(0.0, (rz + 1.4) / 2.8))
             persp = 1.0 / (1.0 - 0.30 * rz)
-            sx = cx + rx * radius * persp * breathe
-            sy = cy - ry * radius * persp * breathe
-            proj.append((sx, sy, depth))
+            sx = cx + rx * radius * persp
+            sy = cy - ry * radius * persp
+            proj.append((sx, sy, depth, ph))
 
-        # Glow additif : les recouvrements s'additionnent -> lumière.
         painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Plus)
 
-        # Traits, triés du plus lointain au plus proche.
-        edges = sorted(
-            self.edges,
-            key=lambda e: (proj[e[0]][2] + proj[e[1]][2]),
-        )
-        for (i, j, weight) in edges:
-            xi, yi, di = proj[i]
-            xj, yj, dj = proj[j]
-            davg = (di + dj) / 2.0
-            alpha = int(120 * weight * (0.15 + 0.85 * davg))
-            if alpha <= 2:
-                continue
-            pen = QPen(self._depth_color(base, davg, alpha))
-            pen.setWidthF(0.5 + 1.1 * davg)
-            painter.setPen(pen)
-            painter.drawLine(int(xi), int(yi), int(xj), int(yj))
+        # Maillage éventuel (arrière -> avant).
+        if self.edges:
+            for (i, j, weight) in sorted(
+                self.edges, key=lambda e: proj[e[0]][2] + proj[e[1]][2]
+            ):
+                xi, yi, di, _ = proj[i]
+                xj, yj, dj, _ = proj[j]
+                dav = (di + dj) / 2.0
+                alpha = 0.5 * weight * (0.1 + 0.9 * dav)
+                if alpha < 0.02:
+                    continue
+                pen = QPen(QColor.fromHslF(hue, 0.9, min(1.0, 0.45 + dav * 0.35), alpha))
+                pen.setWidthF(0.5 + dav * 0.9)
+                painter.setPen(pen)
+                painter.drawLine(int(xi), int(yi), int(xj), int(yj))
 
-        # Points, triés arrière -> avant, avec halo pour ceux de devant.
+        # Particules (arrière -> avant pour un empilement correct).
         painter.setPen(QColor(0, 0, 0, 0))
-        for (sx, sy, depth) in sorted(proj, key=lambda p: p[2]):
-            core = 1.0 + 2.4 * depth
-            if depth > 0.45:  # halo lumineux à l'avant
-                halo = core * 3.2
-                painter.setBrush(self._depth_color(base, depth, int(26 * depth)))
-                painter.drawEllipse(
-                    int(sx - halo), int(sy - halo), int(halo * 2), int(halo * 2)
-                )
-            # Coeur : cyan clair proche du blanc à l'avant.
-            r = min(255, base.red() + int(80 * depth))
-            g = min(255, base.green() + int(50 * depth))
-            b = min(255, base.blue() + int(20 * depth))
-            painter.setBrush(QColor(r, g, b, int(120 + 135 * depth)))
+        for (sx, sy, depth, ph) in sorted(proj, key=lambda p: p[2]):
+            tw = 0.75 + 0.25 * math.sin(t * 3 + ph)
+            alpha = (0.12 + 0.88 * depth) * tw
+            light = min(1.0, 0.52 + depth * 0.38)
+            painter.setBrush(QColor.fromHslF(hue, 1.0, light, min(1.0, alpha)))
+            s = (0.6 + dot * depth) * size_scale
             painter.drawEllipse(
-                int(sx - core), int(sy - core), int(core * 2), int(core * 2)
+                int(sx - s), int(sy - s), int(s * 2), int(s * 2)
             )
 
         painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)

@@ -22,11 +22,15 @@ DEFAULTS: dict[str, Any] = {
     "clock": {"show": True},
     "animations": {
         "sphere": {
-            "count": 170,
-            "link_distance": 0.42,
-            "speed": 0.006,
-            "color": "#63d0ff",
-            "background": "#04060c",
+            "count": 800,
+            "amp": 0.20,
+            "wave_speed": 1.0,
+            "rot_speed": 0.35,
+            "dot_size": 1.7,
+            "hue": 193,
+            "pulse": 0.15,
+            "lines": False,
+            "background": "#05070d",
         },
         "particles": {
             "count": 90,
@@ -66,6 +70,15 @@ def config_path() -> Path:
 class Config:
     def __init__(self, data: dict[str, Any] | None = None):
         self.data = _merge(deepcopy(DEFAULTS), data or {})
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Réinitialise la sphère si elle est encore à l'ancien schéma."""
+        sphere = self.data.get("animations", {}).get("sphere", {})
+        if "link_distance" in sphere or "speed" in sphere:
+            self.data["animations"]["sphere"] = deepcopy(
+                DEFAULTS["animations"]["sphere"]
+            )
 
     # ---- persistance --------------------------------------------------
     @classmethod
