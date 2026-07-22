@@ -22,6 +22,7 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.locker = newLocker()
 	bindApp(a)
+	cleanupKillGuards() // restaure une éventuelle policy laissée par un crash
 	go a.locker.applyHotkey(a.config.Hotkey.Enabled, a.config.Hotkey.Sequence)
 	logf("startup ok — webview initialisée")
 }

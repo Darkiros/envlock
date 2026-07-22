@@ -16,6 +16,8 @@ func (l *Locker) shutdown()                                 {}
 
 func bindApp(a *App) {}
 
+func cleanupKillGuards() {}
+
 func monitorFractions() []MonitorFrac {
 	return []MonitorFrac{{Fx: 0, Fy: 0, Fw: 1, Fh: 1, Primary: true}}
 }

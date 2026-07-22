@@ -5,6 +5,8 @@ package main
 import (
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows/registry"
 )
 
 var (
@@ -128,6 +130,30 @@ func metric(i int) int32 {
 	return int32(r)
 }
 
+// setTaskMgrDisabled (dés)active le Gestionnaire des tâches via la policy
+// per-utilisateur (HKCU, sans droits admin). Ferme la voie de kill la plus
+// courante depuis l'écran Ctrl+Alt+Suppr. Réversible.
+func setTaskMgrDisabled(disabled bool) {
+	k, _, err := registry.CreateKey(
+		registry.CURRENT_USER,
+		`Software\Microsoft\Windows\CurrentVersion\Policies\System`,
+		registry.SET_VALUE,
+	)
+	if err != nil {
+		return
+	}
+	defer k.Close()
+	v := uint32(0)
+	if disabled {
+		v = 1
+	}
+	_ = k.SetDWordValue("DisableTaskMgr", v)
+}
+
+// cleanupKillGuards restaure les policies (au démarrage, au cas où l'app aurait
+// été tuée en état verrouillé).
+func cleanupKillGuards() { setTaskMgrDisabled(false) }
+
 type monitorInfo struct {
 	CbSize    uint32
 	RcMonitor rect
@@ -192,11 +218,13 @@ func (l *Locker) doEnter() {
 		l.hook = h
 	}
 	pSetThreadExecutionSt.Call(esContinuous | esSystemRequired | esDisplayRequired)
+	setTaskMgrDisabled(true)
 	l.startWatch()
 }
 
 func (l *Locker) doExit() {
 	l.stopWatchdog()
+	setTaskMgrDisabled(false)
 	if l.hook != 0 {
 		pUnhookWindowsHookEx.Call(l.hook)
 		l.hook = 0
