@@ -59,6 +59,17 @@ func (a *App) SetClock(on bool) error {
 	return a.config.save()
 }
 
+// SetSphere fusionne les réglages de l'orbe (sliders) et sauvegarde.
+func (a *App) SetSphere(opts map[string]float64) error {
+	if a.config.Sphere == nil {
+		a.config.Sphere = map[string]float64{}
+	}
+	for k, v := range opts {
+		a.config.Sphere[k] = v
+	}
+	return a.config.save()
+}
+
 // MonitorFrac : géométrie d'un moniteur exprimée en fractions [0..1] du
 // bureau virtuel (indépendant du DPI côté frontend).
 type MonitorFrac struct {

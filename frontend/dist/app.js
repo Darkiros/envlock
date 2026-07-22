@@ -49,7 +49,58 @@
   async function onAnimChange() {
     config.animation = $("animSelect").value;
     await App().SetAnimation(config.animation);
+    updateSphereCardVisibility();
     restartPreview();
+  }
+
+  // ---------- Sliders de l'orbe ----------
+  const SPHERE_DEFAULTS = {
+    count: 800, amp: 0.20, wave_speed: 1.0, rot_speed: 0.35,
+    dot_size: 1.7, hue: 193, pulse: 0.15,
+  };
+  const SLIDERS = [
+    { key: "count", fmt: (v) => String(Math.round(v)) },
+    { key: "amp", fmt: (v) => v.toFixed(2) },
+    { key: "wave_speed", fmt: (v) => v.toFixed(2) },
+    { key: "rot_speed", fmt: (v) => v.toFixed(2) },
+    { key: "dot_size", fmt: (v) => v.toFixed(1) },
+    { key: "hue", fmt: (v) => Math.round(v) + "°" },
+    { key: "pulse", fmt: (v) => v.toFixed(2) },
+  ];
+  let saveTimer = null, previewTimer = null;
+  function saveSphereDebounced() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => App().SetSphere(config.sphere), 300);
+  }
+  function previewDebounced() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(restartPreview, 40);
+  }
+  function updateSphereCardVisibility() {
+    $("sphereCard").style.display = config.animation === "sphere" ? "" : "none";
+  }
+  function initSliders() {
+    SLIDERS.forEach((s) => {
+      const el = $("sl_" + s.key), out = $("s_" + s.key);
+      const val = config.sphere[s.key] != null ? config.sphere[s.key] : SPHERE_DEFAULTS[s.key];
+      el.value = val; out.textContent = s.fmt(val);
+      el.oninput = () => {
+        const v = parseFloat(el.value);
+        config.sphere[s.key] = v;
+        out.textContent = s.fmt(v);
+        previewDebounced();
+        saveSphereDebounced();
+      };
+    });
+    $("sphereReset").onclick = () => {
+      Object.assign(config.sphere, SPHERE_DEFAULTS);
+      SLIDERS.forEach((s) => {
+        $("sl_" + s.key).value = config.sphere[s.key];
+        $("s_" + s.key).textContent = s.fmt(config.sphere[s.key]);
+      });
+      restartPreview();
+      App().SetSphere(config.sphere);
+    };
   }
 
   async function onClockChange() {
@@ -206,6 +257,7 @@
   ready(async () => {
     config = await App().GetConfig();
     if (!config.hotkey) config.hotkey = { enabled: true, sequence: "Ctrl+Alt+L" };
+    if (!config.sphere) config.sphere = { ...SPHERE_DEFAULTS };
     $("animSelect").value = config.animation || "sphere";
     $("clockCheck").checked = config.clock !== false;
     $("trayCheck").checked = config.minimize_to_tray !== false;
@@ -213,6 +265,8 @@
     $("hkInput").value = config.hotkey.sequence || "";
     $("hkInput").disabled = !config.hotkey.enabled;
     hkStatus(config.hotkey.enabled, !!config.hotkey.enabled);
+    initSliders();
+    updateSphereCardVisibility();
     wire();
     await refreshPassword();
     restartPreview();

@@ -1,109 +1,113 @@
 # EnvLock 🔒
 
-Verrouilleur d'environnement moderne (PySide6). Affiche un écran plein
-animé, bloque les raccourcis clavier d'évasion et empêche la mise en veille —
-**sans** verrouiller la session Windows. Déverrouillage par mot de passe.
+Verrouilleur d'environnement moderne pour Windows, écrit en **Go + [Wails](https://wails.io)**.
+Affiche un écran plein animé, bloque les raccourcis clavier d'évasion et empêche
+la mise en veille — **sans** verrouiller la session Windows. Déverrouillage par
+mot de passe.
+
+Binaire natif d'environ **9 Mo**, sans dépendance à installer (hors runtime
+WebView2, présent d'office sur Windows 10 récent / 11).
 
 ## Fonctionnalités
 
-- 4 animations au choix, avec **aperçu en direct** : sphère de particules 3D
-  (plexus sphere rotatif), réseau de particules, Matrix rain, dégradé fluide.
-- Horloge/date optionnelle sur l'écran verrouillé.
-- Mot de passe **hashé** (PBKDF2-HMAC-SHA256 + sel, stdlib) dans un fichier de
-  config, **modifiable depuis l'application**.
-- Blocage clavier bas niveau (Windows) : Alt+Tab, touche Windows, Alt+F4,
-  Ctrl+Échap, Ctrl+Maj+Échap…
-- Inhibition de la veille écran/système (`SetThreadExecutionState`).
-- **Réduction dans la barre de notification** (systray) : menu Ouvrir /
-  Verrouiller / Quitter, fermeture de la fenêtre = réduction.
-- **Raccourci global configurable** pour verrouiller à tout moment
-  (`Ctrl+Alt+L` par défaut), même quand l'appli est réduite.
-- Multi-écran : tous les moniteurs sont couverts.
+- **Écran de verrouillage plein écran multi-moniteur** : couvre tous les écrans,
+  une animation par moniteur, horloge + prompt centrés sur l'écran principal.
+- **4 animations** avec aperçu en direct :
+  - *Orbe de particules* (façon JARVIS) — réglable finement (sliders : densité,
+    amplitude/vitesse des vagues, rotation, taille des points, teinte, pulsation).
+  - *Réseau de particules*, *Matrix rain*, *Dégradé fluide*.
+- **Mot de passe hashé** (PBKDF2-HMAC-SHA256 + sel) dans un fichier de config,
+  modifiable depuis l'application.
+- **Blocage clavier bas niveau** (`WH_KEYBOARD_LL`) : Alt+Tab, touche Windows,
+  Alt+F4, Ctrl+Échap, Ctrl+Maj+Échap, Alt+Espace, touche menu…
+- **Inhibition de la veille** écran et système (`SetThreadExecutionState`).
+- **Watchdog premier plan** : réaffirme le topmost toutes les 400 ms si une autre
+  fenêtre tente de passer devant.
+- **Barre de notification (systray)** : menu Ouvrir / Verrouiller / Quitter,
+  fermeture de la fenêtre = réduction dans la barre.
+- **Raccourci global configurable** (`Ctrl+Alt+L` par défaut) : verrouille à tout
+  moment, même application réduite.
+- **Curseur masqué** pendant l'animation (réaffiché sur le prompt).
+- *(Optionnel, si lancé en administrateur)* désactive le Gestionnaire des tâches
+  pendant le verrouillage (`DisableTaskMgr`, restauré au déverrouillage).
 
-## Installation (Windows)
+## ⚠️ Limites (mode utilisateur)
 
-```powershell
-cd envlock
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
+Impossible à contourner sans driver kernel / credential provider signé :
+
+- **Ctrl+Alt+Suppr** (Secure Attention Sequence) ne peut pas être bloqué ni
+  couvert — protection anti-malware volontaire de Windows. Depuis cet écran on
+  peut *Se déconnecter* / *Changer d'utilisateur* (ferme la session).
+- La désactivation du Gestionnaire des tâches nécessite de lancer EnvLock **en
+  administrateur** ; sur un poste géré par GPO d'entreprise, la clé de policy peut
+  être verrouillée en écriture (l'app le détecte et n'échoue pas).
+
+## Télécharger
+
+Chaque push produit un binaire via GitHub Actions :
+
+- Onglet **Actions** → dernier run *Build Windows exe* → artefact **`EnvLock-windows`**
+  (contient `EnvLock.exe` et `EnvLock-debug.exe`).
+- Ou en ligne de commande : `gh run download -n EnvLock-windows`.
+- Une version taggée (`git tag v1.0.0 && git push --tags`) attache `EnvLock.exe`
+  à une **Release** GitHub.
+
+`EnvLock-debug.exe` ouvre une console (diagnostic) ; `EnvLock.exe` est la version
+normale.
+
+## Compiler depuis les sources
+
+Prérequis : [Go](https://go.dev) ≥ 1.23 et la CLI Wails.
+
+```bash
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
+wails build -platform windows/amd64 -s -o EnvLock.exe
+# -> build/bin/EnvLock.exe
 ```
 
-## Lancement
+`-s` saute l'étape frontend (les assets HTML/JS statiques sont déjà dans
+`frontend/dist/` et embarqués via `//go:embed`).
 
-```powershell
-python run.py
-```
+Développement rapide : `wails dev`.
 
-1. Au premier lancement, **définis un mot de passe** dans le panneau.
-2. Choisis une animation (aperçu à droite), active/désactive l'horloge.
-3. Clique sur **Verrouiller maintenant**.
-4. Sur l'écran verrouillé : **Entrée** → saisie du mot de passe → déverrouille.
-   (Échap referme le champ sans déverrouiller.)
+## Utilisation
 
-Le fichier de config est dans `%APPDATA%\EnvLock\config.json`.
+1. Au premier lancement, **définir un mot de passe**.
+2. Choisir une animation (aperçu à droite) ; pour l'orbe, ajuster les sliders.
+3. **Verrouiller** via le bouton, le menu du systray, ou le raccourci global.
+4. Sur l'écran verrouillé : **Entrée** → saisir le mot de passe → déverrouille.
+   (Échap referme le champ.)
 
-## Compiler un .exe (Windows)
+Config : `%APPDATA%\EnvLock\config.json` (mot de passe hashé, animation, réglages
+de l'orbe, raccourci, options).
 
-> ⚠️ La compilation doit se faire **sur Windows** — PyInstaller produit un
-> binaire pour l'OS sur lequel il tourne (pas de cross-compilation depuis WSL).
+## Architecture
 
-En un clic :
-
-```powershell
-build.bat
-```
-
-Ou manuellement :
-
-```powershell
-pip install -r requirements-dev.txt
-pyinstaller --clean EnvLock.spec
-```
-
-Résultat : **`dist\EnvLock.exe`** — un seul fichier, sans fenêtre console.
-
-- Icône optionnelle : place un fichier `assets\envlock.ico` avant le build, il
-  sera pris automatiquement (voir `EnvLock.spec`).
-- UPX (compression) est activé dans le `.spec` ; si UPX n'est pas installé,
-  PyInstaller l'ignore sans erreur.
-- Le hook clavier bas niveau (ctypes) fonctionne parfaitement en `.exe`.
-
-## ⚠️ Limite importante
-
-En mode utilisateur (sans driver kernel signé), **Ctrl+Alt+Suppr** ne peut
-**pas** être bloqué : c'est la *Secure Attention Sequence*, une protection
-volontaire de Windows contre les malwares. Tout le reste est bloqué. Pour
-couvrir aussi Ctrl+Alt+Suppr il faudrait un *credential provider* ou un driver
-— lourd, à éviter pour un usage perso.
-
-## Portage Linux (plus tard)
-
-`platform_lock.py` contient déjà un `NoopLocker` : l'écran s'affiche sur Linux
-mais le blocage clavier natif reste à implémenter (X11 `XGrabKeyboard` /
-inhibiteur de veille D-Bus). Tout le reste (UI, animations, mot de passe) est
-déjà cross-platform.
-
-## Structure
+Go possède toute l'intégration Win32 (fenêtre message cachée + `WndProc` sur une
+goroutine dédiée à boucle de messages) : hook clavier, systray, raccourci,
+anti-veille, plein écran multi-moniteur. La **WebView** (WebView2) affiche l'UI
+(HTML/Canvas). Les deux communiquent via les bindings Wails.
 
 ```
 envlock/
-├── run.py                  # lanceur
-├── requirements.txt
-├── requirements-dev.txt    # + pyinstaller
-├── EnvLock.spec            # config de build PyInstaller
-├── build.bat               # build .exe en un clic (Windows)
-└── envlock/
-    ├── main.py             # orchestration + tray + raccourci global
-    ├── config.py           # config JSON + hachage mot de passe
-    ├── platform_lock.py    # hook clavier + anti-veille (Windows / stub Linux)
-    ├── hotkey.py           # raccourci global RegisterHotKey (Windows / stub)
-    ├── control_panel.py    # UI de réglage + aperçu
-    ├── lock_window.py      # écran verrouillé + prompt mot de passe
-    ├── style.py            # thème sombre (QSS)
-    └── animations/
-        ├── base.py         # QWidget animé ~30 fps
-        ├── particles.py
-        ├── matrix.py
-        └── gradient.py
+├── main.go              # point d'entrée Wails + embed du frontend
+├── app.go               # bindings exposés au frontend (JS <-> Go)
+├── config.go            # config JSON + hachage du mot de passe
+├── logutil.go           # log de diagnostic (%APPDATA%\EnvLock\envlock.log)
+├── win_lock.go          # hook clavier, anti-veille, plein écran, moniteurs (Windows)
+├── win_tray.go          # fenêtre cachée, systray, menu, raccourci global (Windows)
+├── win_stub.go          # stubs non-Windows
+├── wails.json           # config Wails
+├── build/appicon.png    # icône (orbe) -> icône exe + systray
+└── frontend/dist/       # UI embarquée
+    ├── index.html
+    ├── app.js           # logique panneau <-> verrouillage
+    └── animations.js    # les 4 animations (canvas 2D)
 ```
+
+## Portage Linux (plus tard)
+
+`win_stub.go` fournit des stubs : l'UI s'affiche mais le blocage clavier natif,
+l'anti-veille, le systray et le plein écran multi-moniteur restent à implémenter
+(X11/Wayland, D-Bus). Toute la logique UI, animations et mot de passe est déjà
+portable.

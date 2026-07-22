@@ -1,34 +1,20 @@
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-*.egg-info/
+# Sortie de build Wails
+build/bin/
+*.syso
+*.exe
 
-# PyInstaller
-build/
-dist/
-*.spec.bak
+# Dépendances frontend éventuelles
+node_modules/
 
-# Config locale de l'app (contient le hash du mot de passe)
-config.json
+# Exes téléchargés depuis la CI (test local)
+dist-go/
+dist-win/
 
 # OS / éditeurs
 .DS_Store
 .idea/
 .vscode/
+__pycache__/
 
-# Le frontend Wails DOIT être versionné (assets embarqués dans le binaire),
-# même si la règle générique 'dist/' ci-dessus voudrait l'exclure.
-!go/frontend/dist/
-!go/frontend/dist/**
-
-# Icône de l'app Wails à versionner (sinon exclue par 'build/'), mais on garde
-# la sortie de build (go/build/bin) ignorée.
-!go/build/
-!go/build/appicon.png
-go/build/bin/
-
-# Exes téléchargés depuis la CI (ne pas versionner)
-dist-go/
-dist-win/
+# Config locale de l'app (contient le hash du mot de passe) — jamais dans le repo
+config.json

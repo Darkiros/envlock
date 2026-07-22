@@ -22,6 +22,11 @@
   *::-webkit-scrollbar-thumb:hover{background:#3a445a;background-clip:padding-box;}
 
   .previewbox canvas{width:100%;height:100%;display:block;}
+
+  input[type=range]{width:100%;accent-color:var(--cyan);height:4px;cursor:pointer;}
+  .slider{margin:12px 0;}
+  .slider .row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:5px;}
+  .slider .val{color:var(--cyan);font-variant-numeric:tabular-nums;}
   .view{position:fixed;inset:0;display:none;}
   .view.active{display:flex;flex-direction:column;}
 
@@ -114,6 +119,17 @@
             <option value="gradient">Dégradé fluide</option>
           </select>
           <label class="check"><input type="checkbox" id="clockCheck"> Afficher l'horloge sur l'écran verrouillé</label>
+        </div>
+        <div class="card" id="sphereCard">
+          <h2>Réglages de l'orbe</h2>
+          <div class="slider"><div class="row"><label>Particules</label><span class="val" id="s_count"></span></div><input type="range" id="sl_count" min="300" max="3000" step="50"></div>
+          <div class="slider"><div class="row"><label>Amplitude des vagues</label><span class="val" id="s_amp"></span></div><input type="range" id="sl_amp" min="0" max="0.6" step="0.01"></div>
+          <div class="slider"><div class="row"><label>Vitesse des vagues</label><span class="val" id="s_wave_speed"></span></div><input type="range" id="sl_wave_speed" min="0" max="3" step="0.05"></div>
+          <div class="slider"><div class="row"><label>Rotation</label><span class="val" id="s_rot_speed"></span></div><input type="range" id="sl_rot_speed" min="0" max="1.5" step="0.01"></div>
+          <div class="slider"><div class="row"><label>Taille des points</label><span class="val" id="s_dot_size"></span></div><input type="range" id="sl_dot_size" min="0.5" max="4" step="0.1"></div>
+          <div class="slider"><div class="row"><label>Teinte</label><span class="val" id="s_hue"></span></div><input type="range" id="sl_hue" min="150" max="280" step="1"></div>
+          <div class="slider"><div class="row"><label>Pulsation</label><span class="val" id="s_pulse"></span></div><input type="range" id="sl_pulse" min="0" max="0.6" step="0.01"></div>
+          <button class="btn ghost" id="sphereReset">Réinitialiser</button>
         </div>
         <div class="card">
           <h2>Mot de passe</h2>
