@@ -1,12 +1,17 @@
 package main
 
-import "context"
+import (
+	"context"
+
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+)
 
 // App expose les méthodes appelables depuis le frontend (WebView).
 type App struct {
 	ctx    context.Context
 	config Config
 	locker *Locker
+	locked bool
 }
 
 func NewApp() *App {
@@ -16,6 +21,8 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.locker = newLocker()
+	bindApp(a)
+	go a.locker.applyHotkey(a.config.Hotkey.Enabled, a.config.Hotkey.Sequence)
 	logf("startup ok — webview initialisée")
 }
 
@@ -71,7 +78,45 @@ func (a *App) GetMonitors() []MonitorFrac {
 
 // Lock étend la fenêtre sur tout le bureau virtuel, la met au premier plan,
 // installe le hook clavier et empêche la veille.
-func (a *App) Lock() { a.locker.enter() }
+func (a *App) Lock() {
+	a.locked = true
+	wailsruntime.WindowShow(a.ctx)
+	a.locker.enter()
+}
 
 // Unlock restaure la fenêtre et lève le blocage.
-func (a *App) Unlock() { a.locker.exit() }
+func (a *App) Unlock() {
+	a.locker.exit()
+	a.locked = false
+}
+
+func (a *App) SetHotkey(enabled bool, sequence string) bool {
+	a.config.Hotkey.Enabled = enabled
+	a.config.Hotkey.Sequence = sequence
+	_ = a.config.save()
+	return a.locker.applyHotkey(enabled, sequence)
+}
+
+func (a *App) SetMinimizeToTray(on bool) error {
+	a.config.MinimizeToTray = on
+	return a.config.save()
+}
+
+// ---- appelés depuis le tray / le raccourci (côté Go) ----------------
+func (a *App) showWindow() {
+	wailsruntime.WindowShow(a.ctx)
+	wailsruntime.WindowUnminimise(a.ctx)
+}
+
+func (a *App) hotkeyLock() {
+	if a.locked {
+		return
+	}
+	wailsruntime.WindowShow(a.ctx)
+	wailsruntime.EventsEmit(a.ctx, "trigger-lock")
+}
+
+func (a *App) quitApp() {
+	a.locker.shutdown()
+	wailsruntime.Quit(a.ctx)
+}

@@ -130,9 +130,15 @@
         <h2>Aperçu</h2>
         <div class="previewbox" id="previewHost"></div>
         <div class="card" style="margin-top:16px;">
-          <h2>Options</h2>
-          <div class="status">Barre de notification & raccourci global</div>
-          <div class="soon">Bientôt disponibles (prochaine mise à jour).</div>
+          <h2>Barre de notification</h2>
+          <label class="check"><input type="checkbox" id="trayCheck"> Réduire dans la barre au lieu de quitter</label>
+        </div>
+        <div class="card">
+          <h2>Raccourci global</h2>
+          <label class="check"><input type="checkbox" id="hkCheck"> Activer le raccourci de verrouillage</label>
+          <input type="text" id="hkInput" placeholder="Ctrl+Alt+L" readonly style="margin-top:10px;">
+          <div class="soon">Clique le champ puis appuie ta combinaison (Ctrl/Alt/Maj + une touche).</div>
+          <div class="msg" id="hkMsg"></div>
         </div>
       </div>
     </div>

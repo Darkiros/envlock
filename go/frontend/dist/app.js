@@ -66,6 +66,7 @@
   }
 
   async function enterLock() {
+    if ($("lock").classList.contains("active")) return; // déjà verrouillé
     if (!(await App().HasPassword())) { refreshPassword(); return; }
 
     // Un calque animé par moniteur + overlay (horloge/prompt) sur l'écran principal.
@@ -130,16 +131,61 @@
     $("unlockPw").focus();
   }
 
+  function hkStatus(enabled, ok) {
+    const m = $("hkMsg");
+    if (!enabled) { m.className = "msg"; m.textContent = "Raccourci désactivé."; }
+    else if (ok) { m.className = "msg ok"; m.textContent = "Raccourci actif : " + $("hkInput").value; }
+    else { m.className = "msg err"; m.textContent = "Combinaison invalide ou déjà prise."; }
+  }
+
+  async function captureHotkey(e) {
+    e.preventDefault();
+    const parts = [];
+    if (e.ctrlKey) parts.push("Ctrl");
+    if (e.altKey) parts.push("Alt");
+    if (e.shiftKey) parts.push("Shift");
+    if (e.metaKey) parts.push("Win");
+    const k = e.key;
+    if (["Control", "Alt", "Shift", "Meta"].includes(k)) return;
+    let key = null;
+    if (k.length === 1 && /[a-zA-Z0-9]/.test(k)) key = k.toUpperCase();
+    else if (/^F([1-9]|1[0-9]|2[0-4])$/.test(k)) key = k;
+    else if (k === " " || k === "Spacebar") key = "Space";
+    if (!key || parts.length === 0) return; // il faut au moins un modificateur
+    const seq = [...parts, key].join("+");
+    $("hkInput").value = seq;
+    config.hotkey.sequence = seq;
+    const ok = await App().SetHotkey($("hkCheck").checked, seq);
+    hkStatus($("hkCheck").checked, ok);
+  }
+
   // ---------- Événements ----------
   function wire() {
     $("min").onclick = () => window.runtime.WindowMinimise();
-    $("close").onclick = () => window.runtime.Quit();
+    $("close").onclick = () => {
+      if (config.minimize_to_tray !== false) window.runtime.WindowHide();
+      else window.runtime.Quit();
+    };
     $("savePw").onclick = savePassword;
     $("animSelect").onchange = onAnimChange;
     $("clockCheck").onchange = onClockChange;
     $("lockBtn").onclick = enterLock;
     $("doUnlock").onclick = tryUnlock;
     $("cancelUnlock").onclick = () => $("pwcard").classList.remove("show");
+
+    $("trayCheck").onchange = async () => {
+      config.minimize_to_tray = $("trayCheck").checked;
+      await App().SetMinimizeToTray(config.minimize_to_tray);
+    };
+    $("hkCheck").onchange = async () => {
+      const en = $("hkCheck").checked;
+      $("hkInput").disabled = !en;
+      const ok = await App().SetHotkey(en, $("hkInput").value);
+      hkStatus(en, ok);
+    };
+    $("hkInput").addEventListener("keydown", captureHotkey);
+
+    window.runtime.EventsOn("trigger-lock", () => enterLock());
 
     document.addEventListener("keydown", (e) => {
       if (!$("lock").classList.contains("active")) return;
@@ -152,8 +198,14 @@
 
   ready(async () => {
     config = await App().GetConfig();
+    if (!config.hotkey) config.hotkey = { enabled: true, sequence: "Ctrl+Alt+L" };
     $("animSelect").value = config.animation || "sphere";
     $("clockCheck").checked = config.clock !== false;
+    $("trayCheck").checked = config.minimize_to_tray !== false;
+    $("hkCheck").checked = !!config.hotkey.enabled;
+    $("hkInput").value = config.hotkey.sequence || "";
+    $("hkInput").disabled = !config.hotkey.enabled;
+    hkStatus(config.hotkey.enabled, !!config.hotkey.enabled);
     wire();
     await refreshPassword();
     restartPreview();

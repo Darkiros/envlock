@@ -3,9 +3,7 @@
 package main
 
 import (
-	"runtime"
 	"syscall"
-	"time"
 	"unsafe"
 )
 
@@ -124,61 +122,6 @@ var hookProcPtr = syscall.NewCallback(func(nCode, wParam, lParam uintptr) uintpt
 	r, _, _ := pCallNextHookEx.Call(0, nCode, wParam, lParam)
 	return r
 })
-
-type command int
-
-const (
-	cmdEnter command = iota
-	cmdExit
-)
-
-// Locker : toute l'intégration Win32 tourne sur une goroutine dédiée avec
-// une boucle de messages (nécessaire pour le hook bas niveau).
-type Locker struct {
-	cmds chan command
-	hwnd uintptr
-	prev rect
-	hook uintptr
-}
-
-func newLocker() *Locker {
-	l := &Locker{cmds: make(chan command, 8)}
-	go l.worker()
-	return l
-}
-
-func (l *Locker) enter() { l.cmds <- cmdEnter }
-func (l *Locker) exit()  { l.cmds <- cmdExit }
-
-func (l *Locker) worker() {
-	runtime.LockOSThread()
-	ticker := time.NewTicker(5 * time.Millisecond)
-	defer ticker.Stop()
-	var m msg
-	for {
-		select {
-		case c := <-l.cmds:
-			switch c {
-			case cmdEnter:
-				l.doEnter()
-			case cmdExit:
-				l.doExit()
-			}
-		case <-ticker.C:
-		}
-		// Pompe les messages -> le hook clavier peut se déclencher.
-		for {
-			r, _, _ := pPeekMessageW.Call(
-				uintptr(unsafe.Pointer(&m)), 0, 0, 0, pmRemove,
-			)
-			if r == 0 {
-				break
-			}
-			pTranslateMessage.Call(uintptr(unsafe.Pointer(&m)))
-			pDispatchMessageW.Call(uintptr(unsafe.Pointer(&m)))
-		}
-	}
-}
 
 func metric(i int) int32 {
 	r, _, _ := pGetSystemMetrics.Call(uintptr(i))
