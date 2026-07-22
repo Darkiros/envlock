@@ -18,3 +18,7 @@ __pycache__/
 
 # Config locale de l'app (contient le hash du mot de passe) — jamais dans le repo
 config.json
+
+# Fichiers générés par wails build (régénérés depuis appicon.png + templates)
+build/windows/
+frontend/wailsjs/
