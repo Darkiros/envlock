@@ -39,6 +39,7 @@ var (
 const (
 	swHide     = 0
 	swMinimize = 6
+	swRestore  = 9
 )
 
 const (
@@ -276,6 +277,9 @@ func (l *Locker) doEnter() {
 		l.hwnd = r
 	}
 	if l.hwnd != 0 {
+		// Restaure (dé-cache tray / dé-minimise) AVANT de mesurer et d'agrandir.
+		// Fait en Win32 sur ce thread -> pas de course avec des appels Wails.
+		pShowWindow.Call(l.hwnd, swRestore)
 		pGetWindowRect.Call(l.hwnd, uintptr(unsafe.Pointer(&l.prev)))
 		vx, vy := metric(smXVirtual), metric(smYVirtual)
 		vw, vh := metric(smCXVirtual), metric(smCYVirtual)
@@ -309,6 +313,18 @@ func (l *Locker) doExit() {
 			uintptr(w), uintptr(h), swpShowWindow|swpNoActivate)
 	}
 	pSetThreadExecutionSt.Call(esContinuous)
+	// État final déterministe (Win32, ce thread).
+	switch l.exitMode {
+	case exitHide:
+		pShowWindow.Call(l.hwnd, swHide)
+	case exitMinimize:
+		pShowWindow.Call(l.hwnd, swMinimize)
+	}
+	if l.exitMode == exitPanel {
+		forceFocus(l.hwnd) // panneau devant + focus
+	} else if l.fgRestore != 0 {
+		restoreForeground(l.fgRestore) // rendre le premier plan à l'appli d'avant
+	}
 	if l.exitDone != nil {
 		close(l.exitDone)
 	}

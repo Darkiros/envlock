@@ -18,6 +18,13 @@ type App struct {
 	prevForeground   uintptr // fenêtre au premier plan avant le verrouillage
 }
 
+// État de la fenêtre à restaurer au déverrouillage (appliqué par doExit).
+const (
+	exitPanel    = 0 // laisser le panneau visible/devant
+	exitMinimize = 1 // minimiser dans la barre des tâches
+	exitHide     = 2 // cacher dans la zone de notification (tray)
+)
+
 func NewApp() *App {
 	return &App{config: loadConfig()}
 }
@@ -95,13 +102,13 @@ func (a *App) GetMonitors() []MonitorFrac {
 // Lock étend la fenêtre sur tout le bureau virtuel, la met au premier plan,
 // installe le hook clavier et empêche la veille.
 func (a *App) Lock() {
-	a.prevForeground = captureForeground() // AVANT d'afficher/voler le focus
+	a.prevForeground = captureForeground() // AVANT de verrouiller
 	a.lockedFromSelf = a.prevForeground != 0 && a.prevForeground == selfWindow()
 	a.lockedFromHidden = a.hidden
 	a.locked = true
-	wailsruntime.WindowShow(a.ctx)
-	wailsruntime.WindowUnminimise(a.ctx) // s'assurer que le lock s'affiche
 	a.hidden = false
+	// Tout l'affichage/plein écran est fait par doEnter sur le thread worker
+	// (déterministe) : pas d'appels Wails async ici qui se battraient avec.
 	a.locker.enter()
 }
 
@@ -109,23 +116,20 @@ func (a *App) Lock() {
 // verrouillage a été déclenché alors que l'app était dans la barre, on y
 // retourne au lieu d'afficher le panneau.
 func (a *App) Unlock() {
-	a.locker.exit() // synchrone : le dé-plein-écran est terminé au retour
-	a.locked = false
+	// On indique à doExit l'état final à restaurer (appliqué sur le thread
+	// worker, en Win32, après le retrait du plein écran -> pas de race).
+	a.locker.fgRestore = a.prevForeground
 	switch {
 	case a.lockedFromHidden:
-		// Était dans le tray -> y retourner.
+		a.locker.exitMode = exitHide
 		a.hidden = true
-		wailsruntime.WindowHide(a.ctx)
-		bringToForeground(a.prevForeground)
 	case !a.lockedFromSelf:
-		// Était minimisée / en arrière-plan pendant qu'on bossait ailleurs ->
-		// re-minimiser et rendre le premier plan à l'appli précédente.
-		wailsruntime.WindowMinimise(a.ctx)
-		bringToForeground(a.prevForeground)
+		a.locker.exitMode = exitMinimize
 	default:
-		// C'était EnvLock la fenêtre active -> le panneau reste devant.
-		wailsruntime.WindowShow(a.ctx)
+		a.locker.exitMode = exitPanel
 	}
+	a.locker.exit()
+	a.locked = false
 }
 
 // HideToTray réduit la fenêtre dans la barre de notification (suivi côté Go).

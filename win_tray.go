@@ -122,6 +122,8 @@ type Locker struct {
 	tooltip   string
 	stopWatch chan struct{}
 	exitDone  chan struct{} // signalé quand doExit a fini (exit() synchrone)
+	fgRestore uintptr       // fenêtre à réactiver au déverrouillage
+	exitMode  int           // état final : exitPanel / exitMinimize / exitHide
 }
 
 var theLocker *Locker
