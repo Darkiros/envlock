@@ -20,6 +20,8 @@ APP_NAME = "EnvLock"
 DEFAULTS: dict[str, Any] = {
     "animation": "sphere",
     "clock": {"show": True},
+    "hotkey": {"enabled": True, "sequence": "Ctrl+Alt+L"},
+    "minimize_to_tray": True,
     "animations": {
         "sphere": {
             "count": 800,
@@ -115,6 +117,30 @@ class Config:
     @show_clock.setter
     def show_clock(self, value: bool) -> None:
         self.data.setdefault("clock", {})["show"] = bool(value)
+
+    @property
+    def hotkey_enabled(self) -> bool:
+        return bool(self.data.get("hotkey", {}).get("enabled", True))
+
+    @hotkey_enabled.setter
+    def hotkey_enabled(self, value: bool) -> None:
+        self.data.setdefault("hotkey", {})["enabled"] = bool(value)
+
+    @property
+    def hotkey_sequence(self) -> str:
+        return self.data.get("hotkey", {}).get("sequence", "Ctrl+Alt+L")
+
+    @hotkey_sequence.setter
+    def hotkey_sequence(self, value: str) -> None:
+        self.data.setdefault("hotkey", {})["sequence"] = value
+
+    @property
+    def minimize_to_tray(self) -> bool:
+        return bool(self.data.get("minimize_to_tray", True))
+
+    @minimize_to_tray.setter
+    def minimize_to_tray(self, value: bool) -> None:
+        self.data["minimize_to_tray"] = bool(value)
 
     # ---- mot de passe -------------------------------------------------
     def has_password(self) -> bool:

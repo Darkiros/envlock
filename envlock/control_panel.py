@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QKeySequence
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFrame,
     QHBoxLayout,
+    QKeySequenceEdit,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -44,15 +45,36 @@ class PreviewFrame(QFrame):
 
 class ControlPanel(QWidget):
     lock_requested = Signal()
+    hotkey_changed = Signal()
+    minimized_to_tray = Signal()
+    quit_requested = Signal()
 
     def __init__(self, config: Config):
         super().__init__()
         self.config = config
+        self._force_quit = False
         self.setWindowTitle("EnvLock — Panneau de contrôle")
-        self.setMinimumSize(760, 560)
+        self.setMinimumSize(760, 620)
         self._build()
         self._refresh_preview()
         self._refresh_password_state()
+
+    def force_quit(self) -> None:
+        """Autorise la vraie fermeture (depuis le menu Quitter du tray)."""
+        self._force_quit = True
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        # Fermer la fenêtre = réduire dans la barre (sauf Quitter explicite).
+        if self._force_quit:
+            event.accept()
+        elif self.config.minimize_to_tray:
+            event.ignore()
+            self.hide()
+            self.minimized_to_tray.emit()
+        else:
+            # Tray désactivé : fermer la fenêtre quitte réellement l'appli.
+            event.ignore()
+            self.quit_requested.emit()
 
     # ------------------------------------------------------------------
     def _build(self) -> None:
@@ -89,6 +111,33 @@ class ControlPanel(QWidget):
         self.clock_check.setChecked(self.config.show_clock)
         self.clock_check.toggled.connect(self._on_clock_toggled)
         settings.addWidget(self.clock_check)
+
+        settings.addSpacing(8)
+        settings.addWidget(_section_label("Raccourci de verrouillage"))
+        self.hotkey_check = QCheckBox("Activer le raccourci global")
+        self.hotkey_check.setChecked(self.config.hotkey_enabled)
+        self.hotkey_check.toggled.connect(self._on_hotkey_toggled)
+        settings.addWidget(self.hotkey_check)
+
+        hk_row = QHBoxLayout()
+        self.hotkey_edit = QKeySequenceEdit(QKeySequence(self.config.hotkey_sequence))
+        if hasattr(self.hotkey_edit, "setMaximumSequenceLength"):
+            self.hotkey_edit.setMaximumSequenceLength(1)  # une seule combinaison
+        self.hotkey_edit.editingFinished.connect(self._on_hotkey_edited)
+        self.hotkey_edit.setEnabled(self.config.hotkey_enabled)
+        hk_row.addWidget(self.hotkey_edit, 1)
+        clear_hk = QPushButton("Effacer")
+        clear_hk.clicked.connect(self.hotkey_edit.clear)
+        hk_row.addWidget(clear_hk)
+        settings.addLayout(hk_row)
+        self.hotkey_feedback = QLabel("")
+        self.hotkey_feedback.setObjectName("pwStatus")
+        settings.addWidget(self.hotkey_feedback)
+
+        self.tray_check = QCheckBox("Réduire dans la barre au lieu de quitter")
+        self.tray_check.setChecked(self.config.minimize_to_tray)
+        self.tray_check.toggled.connect(self._on_tray_toggled)
+        settings.addWidget(self.tray_check)
 
         settings.addSpacing(8)
         settings.addWidget(_section_label("Mot de passe"))
@@ -149,6 +198,39 @@ class ControlPanel(QWidget):
 
     def _on_clock_toggled(self, checked: bool) -> None:
         self.config.show_clock = checked
+        self.config.save()
+
+    def _on_hotkey_toggled(self, checked: bool) -> None:
+        self.config.hotkey_enabled = checked
+        self.config.save()
+        self.hotkey_edit.setEnabled(checked)
+        self.hotkey_changed.emit()
+
+    def _on_hotkey_edited(self) -> None:
+        seq = self.hotkey_edit.keySequence().toString()
+        self.config.hotkey_sequence = seq
+        self.config.save()
+        self.hotkey_changed.emit()
+
+    def set_hotkey_status(self, ok: bool, sequence: str) -> None:
+        """Retour visuel après (dés)enregistrement du raccourci (appelé par l'app)."""
+        if not self.config.hotkey_enabled:
+            self.hotkey_feedback.setText("Raccourci désactivé.")
+            good = False
+        elif ok:
+            self.hotkey_feedback.setText(f"Raccourci actif : {sequence}")
+            good = True
+        else:
+            self.hotkey_feedback.setText(
+                "Impossible d'enregistrer ce raccourci (déjà pris ?)."
+            )
+            good = False
+        self.hotkey_feedback.setProperty("ok", good)
+        self.hotkey_feedback.style().unpolish(self.hotkey_feedback)
+        self.hotkey_feedback.style().polish(self.hotkey_feedback)
+
+    def _on_tray_toggled(self, checked: bool) -> None:
+        self.config.minimize_to_tray = checked
         self.config.save()
 
     def _refresh_preview(self) -> None:

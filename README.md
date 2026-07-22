@@ -14,6 +14,11 @@ animé, bloque les raccourcis clavier d'évasion et empêche la mise en veille �
 - Blocage clavier bas niveau (Windows) : Alt+Tab, touche Windows, Alt+F4,
   Ctrl+Échap, Ctrl+Maj+Échap…
 - Inhibition de la veille écran/système (`SetThreadExecutionState`).
+- **Réduction dans la barre de notification** (systray) : menu Ouvrir /
+  Verrouiller / Quitter, fermeture de la fenêtre = réduction.
+- **Raccourci global configurable** pour verrouiller à tout moment
+  (`Ctrl+Alt+L` par défaut), même quand l'appli est réduite.
+- Multi-écran : tous les moniteurs sont couverts.
 
 ## Installation (Windows)
 
@@ -89,9 +94,10 @@ envlock/
 ├── EnvLock.spec            # config de build PyInstaller
 ├── build.bat               # build .exe en un clic (Windows)
 └── envlock/
-    ├── main.py             # orchestration panneau <-> écran verrouillé
+    ├── main.py             # orchestration + tray + raccourci global
     ├── config.py           # config JSON + hachage mot de passe
     ├── platform_lock.py    # hook clavier + anti-veille (Windows / stub Linux)
+    ├── hotkey.py           # raccourci global RegisterHotKey (Windows / stub)
     ├── control_panel.py    # UI de réglage + aperçu
     ├── lock_window.py      # écran verrouillé + prompt mot de passe
     ├── style.py            # thème sombre (QSS)
