@@ -12,8 +12,9 @@ type App struct {
 	config           Config
 	locker           *Locker
 	locked           bool
-	hidden           bool // fenêtre réduite dans la barre de notification
-	lockedFromHidden bool // l'app était-elle dans la barre au moment du lock ?
+	hidden           bool    // fenêtre réduite dans la barre de notification
+	lockedFromHidden bool    // l'app était-elle dans la barre au moment du lock ?
+	prevForeground   uintptr // fenêtre au premier plan avant le verrouillage
 }
 
 func NewApp() *App {
@@ -93,7 +94,8 @@ func (a *App) GetMonitors() []MonitorFrac {
 // Lock étend la fenêtre sur tout le bureau virtuel, la met au premier plan,
 // installe le hook clavier et empêche la veille.
 func (a *App) Lock() {
-	a.lockedFromHidden = a.hidden // capturer AVANT d'afficher
+	a.prevForeground = captureForeground() // AVANT d'afficher/voler le focus
+	a.lockedFromHidden = a.hidden
 	a.locked = true
 	wailsruntime.WindowShow(a.ctx)
 	a.hidden = false
@@ -104,6 +106,7 @@ func (a *App) Lock() {
 // verrouillage a été déclenché alors que l'app était dans la barre, on y
 // retourne au lieu d'afficher le panneau.
 func (a *App) Unlock() {
+	a.locker.fgRestore = a.prevForeground // rendre le premier plan à l'appli d'avant
 	a.locker.exit()
 	a.locked = false
 	if a.lockedFromHidden {

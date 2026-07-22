@@ -121,6 +121,7 @@ type Locker struct {
 	ready     chan struct{}
 	tooltip   string
 	stopWatch chan struct{}
+	fgRestore uintptr // fenêtre à remettre au premier plan au déverrouillage
 }
 
 var theLocker *Locker

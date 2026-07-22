@@ -162,6 +162,32 @@ func forceFocus(hwnd uintptr) {
 	}
 }
 
+// captureForeground renvoie la fenêtre actuellement au premier plan (à mémoriser
+// avant de verrouiller, pour y revenir au déverrouillage).
+func captureForeground() uintptr {
+	r, _, _ := pGetForegroundWindow.Call()
+	return r
+}
+
+// restoreForeground redonne le premier plan à une fenêtre donnée.
+func restoreForeground(hwnd uintptr) {
+	if hwnd == 0 {
+		return
+	}
+	target, _, _ := pGetWindowThreadPID.Call(hwnd, 0)
+	cur, _, _ := pGetCurrentThreadId.Call()
+	attached := false
+	if target != cur {
+		r, _, _ := pAttachThreadInput.Call(cur, target, 1)
+		attached = r != 0
+	}
+	pBringWindowToTop.Call(hwnd)
+	pSetForegroundWindow.Call(hwnd)
+	if attached {
+		pAttachThreadInput.Call(cur, target, 0)
+	}
+}
+
 // setTaskMgrDisabled (dés)active le Gestionnaire des tâches via la policy
 // per-utilisateur (HKCU, sans droits admin). Ferme la voie de kill la plus
 // courante depuis l'écran Ctrl+Alt+Suppr. Réversible.
@@ -275,4 +301,8 @@ func (l *Locker) doExit() {
 			uintptr(w), uintptr(h), swpShowWindow)
 	}
 	pSetThreadExecutionSt.Call(esContinuous)
+	// Rend le premier plan à la fenêtre qui l'avait avant le verrouillage.
+	if l.fgRestore != 0 {
+		restoreForeground(l.fgRestore)
+	}
 }
