@@ -140,6 +140,7 @@ func setTaskMgrDisabled(disabled bool) {
 		registry.SET_VALUE,
 	)
 	if err != nil {
+		logf("DisableTaskMgr: CreateKey err=%v", err)
 		return
 	}
 	defer k.Close()
@@ -147,7 +148,11 @@ func setTaskMgrDisabled(disabled bool) {
 	if disabled {
 		v = 1
 	}
-	_ = k.SetDWordValue("DisableTaskMgr", v)
+	if err := k.SetDWordValue("DisableTaskMgr", v); err != nil {
+		logf("DisableTaskMgr: SetDWordValue(%d) err=%v", v, err)
+	} else {
+		logf("DisableTaskMgr = %d (ok)", v)
+	}
 }
 
 // cleanupKillGuards restaure les policies (au démarrage, au cas où l'app aurait
