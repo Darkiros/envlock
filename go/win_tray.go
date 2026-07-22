@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -39,6 +40,7 @@ const (
 	msgTrayCallback = wmApp + 1
 	msgEnter        = wmApp + 2
 	msgExit         = wmApp + 3
+	msgSetHotkey    = wmApp + 4
 
 	wmHotkey        = 0x0312
 	wmCommand       = 0x0111
@@ -117,6 +119,9 @@ type Locker struct {
 var theLocker *Locker
 var theApp *App
 
+// Résultat de l'enregistrement du raccourci, renvoyé par le thread worker.
+var hkResult = make(chan bool, 1)
+
 func newLocker() *Locker {
 	l := &Locker{ready: make(chan struct{}), tooltip: "EnvLock"}
 	theLocker = l
@@ -168,6 +173,22 @@ func wndProc(hwnd, umsg, wparam, lparam uintptr) uintptr {
 	case msgExit:
 		if theLocker != nil {
 			theLocker.doExit()
+		}
+		return 0
+	case msgSetHotkey:
+		// Exécuté sur le thread worker : RegisterHotKey EXIGE le thread
+		// propriétaire de la fenêtre.
+		pUnregisterHotKey.Call(hwnd, hotkeyID)
+		ok := true
+		if wparam == 1 {
+			mods := uint32(lparam>>16) & 0xFFFF
+			vk := uint32(lparam) & 0xFFFF
+			r, _, _ := pRegisterHotKey.Call(hwnd, hotkeyID, uintptr(mods), uintptr(vk))
+			ok = r != 0
+		}
+		select {
+		case hkResult <- ok:
+		default:
 		}
 		return 0
 	case wmHotkey:
@@ -284,16 +305,37 @@ func (l *Locker) exit() {
 
 func (l *Locker) applyHotkey(enabled bool, seq string) bool {
 	<-l.ready
-	pUnregisterHotKey.Call(l.msgHwnd, hotkeyID)
-	if !enabled {
+	var mods, vk uint32
+	if enabled {
+		var ok bool
+		mods, vk, ok = parseHotkey(seq)
+		if !ok {
+			l.postSetHotkey(false, 0, 0) // au moins désenregistrer
+			return false
+		}
+	}
+	return l.postSetHotkey(enabled, mods, vk)
+}
+
+// postSetHotkey demande au thread worker d'(dé)enregistrer le raccourci et
+// attend son résultat réel.
+func (l *Locker) postSetHotkey(enabled bool, mods, vk uint32) bool {
+	var en uintptr
+	if enabled {
+		en = 1
+	}
+	lp := uintptr(mods)<<16 | uintptr(vk)
+	select { // vide un éventuel résultat périmé
+	case <-hkResult:
+	default:
+	}
+	pPostMessageW.Call(l.msgHwnd, msgSetHotkey, en, lp)
+	select {
+	case r := <-hkResult:
+		return r
+	case <-time.After(500 * time.Millisecond):
 		return false
 	}
-	mods, vk, ok := parseHotkey(seq)
-	if !ok {
-		return false
-	}
-	r, _, _ := pRegisterHotKey.Call(l.msgHwnd, hotkeyID, uintptr(mods), uintptr(vk))
-	return r != 0
 }
 
 func (l *Locker) shutdown() {
