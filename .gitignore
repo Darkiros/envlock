@@ -17,3 +17,8 @@ config.json
 .DS_Store
 .idea/
 .vscode/
+
+# Le frontend Wails DOIT être versionné (assets embarqués dans le binaire),
+# même si la règle générique 'dist/' ci-dessus voudrait l'exclure.
+!go/frontend/dist/
+!go/frontend/dist/**
