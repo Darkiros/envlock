@@ -8,10 +8,12 @@ import (
 
 // App expose les méthodes appelables depuis le frontend (WebView).
 type App struct {
-	ctx    context.Context
-	config Config
-	locker *Locker
-	locked bool
+	ctx              context.Context
+	config           Config
+	locker           *Locker
+	locked           bool
+	hidden           bool // fenêtre réduite dans la barre de notification
+	lockedFromHidden bool // l'app était-elle dans la barre au moment du lock ?
 }
 
 func NewApp() *App {
@@ -91,15 +93,29 @@ func (a *App) GetMonitors() []MonitorFrac {
 // Lock étend la fenêtre sur tout le bureau virtuel, la met au premier plan,
 // installe le hook clavier et empêche la veille.
 func (a *App) Lock() {
+	a.lockedFromHidden = a.hidden // capturer AVANT d'afficher
 	a.locked = true
 	wailsruntime.WindowShow(a.ctx)
+	a.hidden = false
 	a.locker.enter()
 }
 
-// Unlock restaure la fenêtre et lève le blocage.
+// Unlock lève le blocage et rend la main dans l'état précédent : si le
+// verrouillage a été déclenché alors que l'app était dans la barre, on y
+// retourne au lieu d'afficher le panneau.
 func (a *App) Unlock() {
 	a.locker.exit()
 	a.locked = false
+	if a.lockedFromHidden {
+		a.hidden = true
+		wailsruntime.WindowHide(a.ctx)
+	}
+}
+
+// HideToTray réduit la fenêtre dans la barre de notification (suivi côté Go).
+func (a *App) HideToTray() {
+	a.hidden = true
+	wailsruntime.WindowHide(a.ctx)
 }
 
 func (a *App) SetHotkey(enabled bool, sequence string) bool {
@@ -116,6 +132,7 @@ func (a *App) SetMinimizeToTray(on bool) error {
 
 // ---- appelés depuis le tray / le raccourci (côté Go) ----------------
 func (a *App) showWindow() {
+	a.hidden = false
 	wailsruntime.WindowShow(a.ctx)
 	wailsruntime.WindowUnminimise(a.ctx)
 }
@@ -124,7 +141,8 @@ func (a *App) hotkeyLock() {
 	if a.locked {
 		return
 	}
-	wailsruntime.WindowShow(a.ctx)
+	// On n'affiche PAS ici : Lock() (déclenché par le frontend) capture d'abord
+	// l'état "caché" puis affiche, pour pouvoir y revenir au déverrouillage.
 	wailsruntime.EventsEmit(a.ctx, "trigger-lock")
 }
 

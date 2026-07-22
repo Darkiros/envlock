@@ -223,7 +223,7 @@
   function wire() {
     $("min").onclick = () => window.runtime.WindowMinimise();
     $("close").onclick = () => {
-      if (config.minimize_to_tray !== false) window.runtime.WindowHide();
+      if (config.minimize_to_tray !== false) App().HideToTray();
       else window.runtime.Quit();
     };
     $("savePw").onclick = savePassword;
