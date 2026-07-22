@@ -100,8 +100,9 @@
     clockTimer = setInterval(updateClock, 1000);
 
     showView("lock");
+    hidePwCard();
+    $("lock").style.cursor = "none"; // masque la souris pendant l'animation
     await App().Lock(); // Go : plein écran multi-moniteur + hook clavier + anti-veille
-    $("pwcard").classList.remove("show");
     setTimeout(() => window.focus(), 60);
   }
 
@@ -128,7 +129,13 @@
   function showPwCard() {
     $("unlockMsg").textContent = ""; $("unlockPw").value = "";
     $("pwcard").classList.add("show");
+    $("lock").style.cursor = "auto"; // souris visible pour viser le champ/boutons
     $("unlockPw").focus();
+  }
+
+  function hidePwCard() {
+    $("pwcard").classList.remove("show");
+    if ($("lock").classList.contains("active")) $("lock").style.cursor = "none";
   }
 
   function hkStatus(enabled, ok) {
@@ -171,7 +178,7 @@
     $("clockCheck").onchange = onClockChange;
     $("lockBtn").onclick = enterLock;
     $("doUnlock").onclick = tryUnlock;
-    $("cancelUnlock").onclick = () => $("pwcard").classList.remove("show");
+    $("cancelUnlock").onclick = hidePwCard;
 
     $("trayCheck").onchange = async () => {
       config.minimize_to_tray = $("trayCheck").checked;
@@ -192,7 +199,7 @@
       const carte = $("pwcard").classList.contains("show");
       if (e.key === "Enter" && !carte) { showPwCard(); e.preventDefault(); }
       else if (e.key === "Enter" && carte) { tryUnlock(); e.preventDefault(); }
-      else if (e.key === "Escape" && carte) { $("pwcard").classList.remove("show"); }
+      else if (e.key === "Escape" && carte) { hidePwCard(); }
     });
   }
 

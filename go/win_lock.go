@@ -192,9 +192,11 @@ func (l *Locker) doEnter() {
 		l.hook = h
 	}
 	pSetThreadExecutionSt.Call(esContinuous | esSystemRequired | esDisplayRequired)
+	l.startWatch()
 }
 
 func (l *Locker) doExit() {
+	l.stopWatchdog()
 	if l.hook != 0 {
 		pUnhookWindowsHookEx.Call(l.hook)
 		l.hook = 0

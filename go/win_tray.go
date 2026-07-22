@@ -31,6 +31,7 @@ var (
 	pRegisterHotKey      = user32.NewProc("RegisterHotKey")
 	pUnregisterHotKey    = user32.NewProc("UnregisterHotKey")
 	pLoadIconW           = user32.NewProc("LoadIconW")
+	pGetForegroundWindow = user32.NewProc("GetForegroundWindow")
 	pShellNotifyIconW    = shell32.NewProc("Shell_NotifyIconW")
 	pExtractIconW        = shell32.NewProc("ExtractIconW")
 )
@@ -41,6 +42,11 @@ const (
 	msgEnter        = wmApp + 2
 	msgExit         = wmApp + 3
 	msgSetHotkey    = wmApp + 4
+	msgReassert     = wmApp + 5
+
+	swpNoSize     = 0x0001
+	swpNoMove     = 0x0002
+	swpNoActivate = 0x0010
 
 	wmHotkey        = 0x0312
 	wmCommand       = 0x0111
@@ -108,12 +114,13 @@ type notifyIconData struct {
 // Locker : intégration Win32 sur une goroutine dédiée (fenêtre cachée +
 // boucle de messages, indispensable au hook clavier, au tray et au raccourci).
 type Locker struct {
-	msgHwnd uintptr
-	hwnd    uintptr // fenêtre Wails (cible du plein écran)
-	prev    rect
-	hook    uintptr
-	ready   chan struct{}
-	tooltip string
+	msgHwnd   uintptr
+	hwnd      uintptr // fenêtre Wails (cible du plein écran)
+	prev      rect
+	hook      uintptr
+	ready     chan struct{}
+	tooltip   string
+	stopWatch chan struct{}
 }
 
 var theLocker *Locker
@@ -194,6 +201,17 @@ func wndProc(hwnd, umsg, wparam, lparam uintptr) uintptr {
 	case wmHotkey:
 		if theApp != nil {
 			theApp.hotkeyLock()
+		}
+		return 0
+	case msgReassert:
+		// Garde la fenêtre de verrouillage au-dessus de tout + au premier plan.
+		if theLocker != nil && theLocker.hwnd != 0 {
+			pSetWindowPos.Call(theLocker.hwnd, hwndTopmost, 0, 0, 0, 0,
+				swpNoMove|swpNoSize|swpNoActivate)
+			fg, _, _ := pGetForegroundWindow.Call()
+			if fg != theLocker.hwnd {
+				pSetForegroundWindow.Call(theLocker.hwnd)
+			}
 		}
 		return 0
 	case msgTrayCallback:
@@ -290,6 +308,30 @@ func showTrayMenu(hwnd uintptr) {
 	pSetForegroundWindow.Call(hwnd)
 	pTrackPopupMenu.Call(hmenu, tpmRight, uintptr(pt.X), uintptr(pt.Y), 0, hwnd, 0)
 	pDestroyMenu.Call(hmenu)
+}
+
+// startWatch ré-affirme le premier plan/topmost pendant le verrouillage.
+func (l *Locker) startWatch() {
+	l.stopWatch = make(chan struct{})
+	go func(stop chan struct{}, hwnd uintptr) {
+		t := time.NewTicker(400 * time.Millisecond)
+		defer t.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-t.C:
+				pPostMessageW.Call(hwnd, msgReassert, 0, 0)
+			}
+		}
+	}(l.stopWatch, l.msgHwnd)
+}
+
+func (l *Locker) stopWatchdog() {
+	if l.stopWatch != nil {
+		close(l.stopWatch)
+		l.stopWatch = nil
+	}
 }
 
 // ---- API utilisée par App -------------------------------------------
