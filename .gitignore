@@ -28,3 +28,7 @@ config.json
 !go/build/
 !go/build/appicon.png
 go/build/bin/
+
+# Exes téléchargés depuis la CI (ne pas versionner)
+dist-go/
+dist-win/
