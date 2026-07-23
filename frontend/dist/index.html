@@ -74,7 +74,8 @@
   .btn.lock:hover{background:#8fe0ff;}
 
   /* ---------- écran verrouillé ---------- */
-  #lock{background:#05070d;display:none;}
+  #lock{background:#05070d;display:none;--wails-draggable:no-drag;}
+  #lock *{--wails-draggable:no-drag;}
   #lock.active{display:block;}
   #layers{position:absolute;inset:0;}
   #layers canvas{position:absolute;}

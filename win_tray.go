@@ -207,10 +207,14 @@ func wndProc(hwnd, umsg, wparam, lparam uintptr) uintptr {
 		}
 		return 0
 	case msgReassert:
-		// Garde la fenêtre de verrouillage au-dessus de tout + au premier plan.
+		// Re-plaque la fenêtre en plein écran (position + taille + topmost) :
+		// annule tout déplacement/redimensionnement/passage devant.
 		if theLocker != nil && theLocker.hwnd != 0 {
-			pSetWindowPos.Call(theLocker.hwnd, hwndTopmost, 0, 0, 0, 0,
-				swpNoMove|swpNoSize|swpNoActivate)
+			vx, vy := metric(smXVirtual), metric(smYVirtual)
+			vw, vh := metric(smCXVirtual), metric(smCYVirtual)
+			pSetWindowPos.Call(theLocker.hwnd, hwndTopmost,
+				uintptr(vx), uintptr(vy), uintptr(vw), uintptr(vh),
+				swpShowWindow|swpNoActivate)
 			fg, _, _ := pGetForegroundWindow.Call()
 			if fg != theLocker.hwnd {
 				pSetForegroundWindow.Call(theLocker.hwnd)
@@ -320,7 +324,7 @@ func showTrayMenu(hwnd uintptr) {
 func (l *Locker) startWatch() {
 	l.stopWatch = make(chan struct{})
 	go func(stop chan struct{}, hwnd uintptr) {
-		t := time.NewTicker(400 * time.Millisecond)
+		t := time.NewTicker(250 * time.Millisecond)
 		defer t.Stop()
 		for {
 			select {
