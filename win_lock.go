@@ -32,9 +32,38 @@ var (
 	pSetFocus             = user32.NewProc("SetFocus")
 	pGetWindow            = user32.NewProc("GetWindow")
 	pShowWindow           = user32.NewProc("ShowWindow")
+	pSetWindowLongPtrW    = user32.NewProc("SetWindowLongPtrW")
+	pGetWindowLongPtrW    = user32.NewProc("GetWindowLongPtrW")
+	pCallWindowProcW      = user32.NewProc("CallWindowProcW")
 	pSetThreadExecutionSt = kernel32.NewProc("SetThreadExecutionState")
 	pGetCurrentThreadId   = kernel32.NewProc("GetCurrentThreadId")
 )
+
+const (
+	gwlpWndProc         = ^uintptr(3) // GWLP_WNDPROC (-4)
+	wmWindowPosChanging = 0x0046
+)
+
+type windowPos struct {
+	Hwnd            uintptr
+	HwndInsertAfter uintptr
+	X, Y, Cx, Cy    int32
+	Flags           uint32
+}
+
+// origWndProc : window proc d'origine de la fenêtre Wails (restaurée au unlock).
+var origWndProc uintptr
+
+// lockWndProc refuse tout déplacement/redimensionnement de la fenêtre pendant
+// le verrouillage (WM_WINDOWPOSCHANGING -> on force SWP_NOMOVE|SWP_NOSIZE).
+var lockWndProcPtr = syscall.NewCallback(func(hwnd, umsg, wparam, lparam uintptr) uintptr {
+	if umsg == wmWindowPosChanging {
+		wp := (*windowPos)(unsafe.Pointer(lparam))
+		wp.Flags |= swpNoMove | swpNoSize
+	}
+	r, _, _ := pCallWindowProcW.Call(origWndProc, hwnd, umsg, wparam, lparam)
+	return r
+})
 
 const (
 	swHide     = 0
@@ -292,12 +321,23 @@ func (l *Locker) doEnter() {
 	}
 	pSetThreadExecutionSt.Call(esContinuous | esSystemRequired | esDisplayRequired)
 	setTaskMgrDisabled(true)
+	// Empêche TOUT déplacement/redimensionnement de la fenêtre pendant le lock.
+	if l.hwnd != 0 && origWndProc == 0 {
+		origWndProc, _, _ = pGetWindowLongPtrW.Call(l.hwnd, gwlpWndProc)
+		pSetWindowLongPtrW.Call(l.hwnd, gwlpWndProc, lockWndProcPtr)
+	}
 	forceFocus(l.hwnd) // focus clavier immédiat (sinon il faut cliquer)
 	l.startWatch()
 }
 
 func (l *Locker) doExit() {
 	l.stopWatchdog()
+	// Restaure la window proc d'origine AVANT de dé-agrandir (sinon le
+	// repositionnement serait bloqué par notre proc).
+	if origWndProc != 0 && l.hwnd != 0 {
+		pSetWindowLongPtrW.Call(l.hwnd, gwlpWndProc, origWndProc)
+		origWndProc = 0
+	}
 	setTaskMgrDisabled(false)
 	if l.hook != 0 {
 		pUnhookWindowsHookEx.Call(l.hook)
